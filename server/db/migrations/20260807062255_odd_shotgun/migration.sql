@@ -1,0 +1,1 @@
+ALTER TABLE "room_event" ALTER COLUMN "text" SET DATA TYPE varchar(240) USING "text"::varchar(240);

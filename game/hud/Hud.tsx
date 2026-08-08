@@ -1,0 +1,99 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { SIGN } from "@/components/island/ui";
+import { usePlayerController } from "@/game/core/playerControl";
+import { usePresenceStore } from "@/game/net/presence";
+import { OWNER_NAME, SITE_NAME } from "@/shared/constants";
+import { ChatComposer } from "./ChatComposer";
+import { InteractionPrompt } from "./InteractionPrompt";
+import { Shortcuts } from "./Shortcuts";
+import { StampCard } from "./StampCard";
+import { useHudStore } from "./store";
+import { TouchControls } from "./TouchControls";
+
+/**
+ * 화면 위에 얹히는 2D 레이어.
+ *
+ * shadcn 을 쓰지 않고 직접 짠다. HUD 는 "다이얼로그 · 폼" 같은 일반 UI 가 아니라
+ * 게임 화면을 가리지 않아야 하는 오버레이라서, 컴포넌트 라이브러리의 기본값
+ * (배경 딤, 포커스 트랩, 스크롤 잠금)이 전부 방해가 된다. (기획서 §10)
+ */
+export function Hud({ minimap }: { minimap?: React.ReactNode }) {
+  const openPanelId = useHudStore((state) => state.openPanelId);
+  const online = usePresenceStore((state) => state.online);
+  const direct = usePresenceStore((state) => state.direct);
+  const controllerRef = usePlayerController();
+  const [booted, setBooted] = useState(false);
+
+  // 인트로 카메라가 도는 3초 동안은 HUD 를 감춘다. 첫 화면은 섬만 보여준다.
+  useEffect(() => {
+    const timer = setTimeout(() => setBooted(true), 2600);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // F 로 밀친다. Space(점프)·Enter(채팅)와 겹치지 않는 자리를 골랐다.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "KeyF") return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable
+      ) {
+        return;
+      }
+      event.preventDefault();
+      controllerRef.current?.shove();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [controllerRef]);
+
+  const panelOpen = openPanelId !== null;
+
+  if (!booted) {
+    return (
+      <div className="-translate-x-1/2 pointer-events-none fixed bottom-10 left-1/2 z-10 text-center">
+        <p className="font-bold text-[13px] text-white/80 tracking-[0.3em] drop-shadow">
+          {OWNER_NAME.toUpperCase()}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* 좌상단 상태 바. 터미널 프롬프트처럼 읽히게 한다 */}
+      <header className="fade-in pointer-events-none fixed top-4 left-4 z-10 animate-in select-none">
+        {/*
+          간판 하나로 합쳤다. 예전엔 칩 두 개가 위아래로 붙어 있었는데,
+          웹사이트의 로고+태그라인 배치라 화면에서 붕 떠 보였다.
+        */}
+        <div className={`flex items-center gap-2.5 px-3.5 py-2 ${SIGN}`}>
+          <span className="size-2.5 animate-pulse rounded-full bg-[#5e9c55] ring-2 ring-[#4a3428]" />
+          <span className="font-bold text-[14px] text-[#3a2a22]">
+            {SITE_NAME}
+          </span>
+          <span className="h-4 w-[2px] rounded bg-[#d9c9a8]" />
+          <span className="font-bold text-[13px] text-[#8a7460] tabular-nums">
+            {online}명
+          </span>
+          {direct > 0 && (
+            <span className="rounded-full bg-[#5e9c55] px-2 py-0.5 font-bold text-[10px] text-[#fdf6e8]">
+              p2p
+            </span>
+          )}
+        </div>
+      </header>
+
+      {minimap}
+      <StampCard />
+      <InteractionPrompt />
+      {!panelOpen && <ChatComposer />}
+      {!panelOpen && <TouchControls />}
+      {!panelOpen && <Shortcuts />}
+    </>
+  );
+}

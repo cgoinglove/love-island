@@ -22,7 +22,20 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "style": {
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "patterns": [
+              {
+                "group": ["@/features/*/**"],
+                "message": "feature 내부 파일은 밖에서 import할 수 없습니다. 공개 창구는 @/features/<name> (index.ts) 뿐. [기획서 §3 배럴 패턴]"
+              }
+            ]
+          }
+        }
+      }
     },
     "domains": {
       "next": "recommended",
@@ -35,5 +48,210 @@
         "organizeImports": "on"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["game/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@/features/**", "@/server/**", "@/app/**"],
+                    "message": "game/ 은 feature·server·app을 모릅니다. 연결은 등록(registry)으로. [기획서 §2.2, §4.3]"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["game/core/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "@/features/**",
+                      "@/server/**",
+                      "@/app/**",
+                      "@/components/**"
+                    ],
+                    "message": "game/core 는 어떤 feature도 import하지 않습니다. [기획서 §2.2]"
+                  },
+                  {
+                    "group": [
+                      "@/game/player/**",
+                      "@/game/world/**",
+                      "@/game/camera/**",
+                      "@/game/net/**",
+                      "@/game/hud/**"
+                    ],
+                    "message": "core는 상위 game 모듈을 모릅니다. 의존 방향은 game/* → game/core 한 방향뿐. [기획서 §2.2]"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "game/core/coords.ts",
+        "game/core/loop.ts",
+        "game/core/island.ts",
+        "game/core/nav/**",
+        "game/net/interpolation.ts",
+        "game/net/poseCodec.ts",
+        "game/player/simulation.ts",
+        "game/player/pathFollow.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "@/features/**",
+                      "@/server/**",
+                      "@/app/**",
+                      "@/components/**"
+                    ],
+                    "message": "game/core 는 어떤 feature도 import하지 않습니다. [기획서 §2.2]"
+                  },
+                  {
+                    "group": [
+                      "@/game/player/**",
+                      "@/game/world/**",
+                      "@/game/camera/**",
+                      "@/game/net/**",
+                      "@/game/hud/**"
+                    ],
+                    "message": "core는 상위 game 모듈을 모릅니다. [기획서 §2.2]"
+                  },
+                  {
+                    "group": [
+                      "three",
+                      "three/**",
+                      "react",
+                      "react-dom",
+                      "@react-three/**"
+                    ],
+                    "message": "순수 로직 파일입니다. three/react 없이 짜야 vitest로 테스트할 수 있습니다. 벡터가 필요하면 shared의 Vec3 튜플을 쓰세요. [기획서 §7.3]"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["features/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["@/features/**"],
+                    "message": "feature끼리 직접 import 금지 (guestbook은 gallery를 모릅니다). 같은 feature 내부는 상대경로로. [기획서 §2.2]"
+                  },
+                  {
+                    "group": ["@/server/**", "@/app/**"],
+                    "message": "feature는 server 코드를 직접 import하지 않습니다. HTTP 경계를 거치세요 (schema.ts + api.ts). [기획서 §6]"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["server/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "@/game/**",
+                      "@/features/**",
+                      "@/app/**",
+                      "@/components/**",
+                      "three",
+                      "@react-three/**",
+                      "react-dom"
+                    ],
+                    "message": "server/ 는 shared/ 외에 아무것도 import하지 않습니다. 클라이언트 번들에 절대 들어가면 안 됩니다. [기획서 §2.2]"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["shared/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "@/game/**",
+                      "@/features/**",
+                      "@/server/**",
+                      "@/app/**",
+                      "@/components/**",
+                      "@/lib/**"
+                    ],
+                    "message": "shared/ 는 아무것도 import하지 않습니다. 의존성 그래프의 잎(leaf)입니다. [기획서 §2.2]"
+                  },
+                  {
+                    "group": [
+                      "three",
+                      "three/**",
+                      "react",
+                      "react-dom",
+                      "@react-three/**",
+                      "next",
+                      "next/**",
+                      "node:*",
+                      "fs",
+                      "path"
+                    ],
+                    "message": "shared/ 는 브라우저·워커·노드 어디서든 돌아가야 합니다. DOM·fs·렌더러 의존 금지. [기획서 §2.2]"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

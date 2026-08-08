@@ -1,0 +1,75 @@
+{
+  "$schema": "./README.md",
+  "owner": {
+    "name": "cgoing",
+    "tagline": "걸어서 갈 수 있는 이력서",
+    "contact": "neo.cgoing@gmail.com"
+  },
+  "career": {
+    "intro": "만든 것, 고친 것, 그리고 배운 것",
+    "entries": [
+      {
+        "period": "2024 — 현재",
+        "role": "프론트엔드 엔지니어",
+        "org": "회사 이름",
+        "body": "여기에 무슨 일을 했는지 적습니다. 만든 것, 고친 것, 숫자로 남은 결과.",
+        "stack": ["TypeScript", "Next.js", "React"]
+      },
+      {
+        "period": "2022 — 2024",
+        "role": "웹 개발자",
+        "org": "이전 회사",
+        "body": "content/profile.json 을 고치고 커밋하면 이 화면이 바뀝니다.",
+        "stack": ["React", "Node.js", "PostgreSQL"]
+      },
+      {
+        "period": "취미",
+        "role": "러브 아일랜드",
+        "org": "개인 프로젝트",
+        "body": "지금 서 계신 이 섬. three.js · WebRTC · Postgres 로 만들었습니다.",
+        "stack": ["three.js", "WebRTC", "Drizzle"]
+      }
+    ]
+  },
+  "album": {
+    "intro": "찍어둔 것들",
+    "photos": [
+      {
+        "id": "p1",
+        "caption": "첫 커밋을 밀던 새벽",
+        "when": "2026. 8",
+        "tint": "#f6c9a8"
+      },
+      {
+        "id": "p2",
+        "caption": "바다 셰이더가 처음 파도친 날",
+        "when": "2026. 8",
+        "tint": "#a8d5f6"
+      },
+      {
+        "id": "p3",
+        "caption": "나무를 100그루 심었다 다시 뽑았다",
+        "when": "2026. 8",
+        "tint": "#bfe6b0"
+      },
+      {
+        "id": "p4",
+        "caption": "두 브라우저가 서로를 처음 본 순간",
+        "when": "2026. 8",
+        "tint": "#d9c2f0"
+      },
+      {
+        "id": "p5",
+        "caption": "public/photos/ 에 넣고 src 를 적으세요",
+        "when": "언젠가",
+        "tint": "#f6e2a8"
+      },
+      {
+        "id": "p6",
+        "caption": "content/profile.json 의 photos 배열입니다",
+        "when": "언젠가",
+        "tint": "#f6b0b0"
+      }
+    ]
+  }
+}
