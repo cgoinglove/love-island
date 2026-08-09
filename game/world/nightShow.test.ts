@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shoreRadiusAt } from "@/game/core/island";
+import { SEA_BANNER, shoreRadiusAt } from "@/game/core/island";
 import {
   SHOOTING_STAR_DURATION,
   shellsToFire,
@@ -77,32 +77,33 @@ describe("불꽃놀이 연출", () => {
     expect(positions.size).toBeGreaterThan(Math.max(a, b));
   });
 
-  it("바다 위, 그리고 화면 안에서 터진다", () => {
+  it("깃발보다 먼 바다에서, 그리고 화면 안에서 터진다", () => {
     /**
-     * 두 가지를 동시에 만족해야 한다.
+     * 세 가지를 동시에 만족해야 한다.
      *
      * ① 섬 위면 안 된다 — 눈높이라 눈부시고 걸어다니는 자리를 파티클이 덮는다.
-     * ② 너무 멀어도 안 된다 — 카메라에서 100m 넘게 떨어지면 곡률이 13m 를
-     *    끌어내려 터지는 지점이 수평선 아래로 가라앉는다. 실제로 그래서
-     *    처음엔 연출이 하나도 안 보였다.
-     *
-     * 그래서 **해안선 기준** 바깥 7~16m 로 잡는다. 어느 방향이든 물 위이면서
-     * 카메라에서 가깝다.
+     * ② **배너보다 멀어야** 한다. 앞에서 터지면 깃발을 가려서 "깃발 앞에서
+     *    폭죽이 터지는" 그림이 된다 — 원근이 통째로 어긋나 보인다.
+     * ③ 화면 안이어야 한다. 카메라는 북쪽을 보고 가로 화각이 ±33° 남짓이라
+     *    그 바깥에서 터지면 아무도 못 본다.
      */
+    const bannerDistance = Math.hypot(SEA_BANNER[0], SEA_BANNER[1]);
+
     for (let t = 0; t < CYCLE * 3; t += 0.1) {
       for (const shot of shellsToFire(t, CYCLE, 0.1)) {
         const angle = Math.atan2(shot.at[1], shot.at[0]);
         const radius = Math.hypot(shot.at[0], shot.at[1]);
-        const overWater = radius - shoreRadiusAt(angle);
-        expect(overWater).toBeGreaterThan(2);
-        expect(overWater).toBeLessThan(11);
 
-        /**
-         * 카메라는 북쪽을 보고 가로 화각이 ±30° 남짓이다.
-         * 북쪽 절반에 고루 뿌렸더니 대부분 화면 밖에서 터졌다 — 정북 ±40° 안이어야 한다.
-         */
+        // 어느 방향으로 쏘든 해안선 한참 바깥 = 물 위.
+        expect(radius - shoreRadiusAt(angle)).toBeGreaterThan(20);
+        expect(radius).toBeGreaterThan(bannerDistance + 4);
+        // 무한정 멀어져도 안 된다 — 곡률이 거리 제곱으로 끌어내린다.
+        expect(radius).toBeLessThan(95);
+
         const bearing = Math.atan2(shot.at[0], -shot.at[1]);
         expect(Math.abs(bearing)).toBeLessThan(0.75);
+        // 정북 한가운데는 배너 자리라 비워둔다.
+        expect(Math.abs(bearing)).toBeGreaterThan(0.2);
       }
     }
   });

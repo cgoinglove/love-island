@@ -124,8 +124,12 @@ export function lookOf(playerId: string): CharacterLook {
     accessoryColor:
       ACCESSORY_COLORS[pickIndex(hash, 7, ACCESSORY_COLORS.length)] ??
       "#5e9c55",
-    // 1.2 ~ 3.6 rad/s. 느린 쪽은 여유롭고 빠른 쪽은 신난 것처럼 보인다.
-    armSpeed: 1.2 + pickUnit(hash, 8) * 2.4,
+    /**
+     * 3.0 ~ 9.0 rad/s (한 번 올렸다 내리는 데 0.7~2.1초).
+     * 1.2~3.6 이었을 땐 제일 느린 캐릭터가 5초에 한 번 팔을 들어서, 움직이는 건지
+     * 멈춘 건지 알 수 없었다. 느린 쪽은 여유롭고 빠른 쪽은 신난 것처럼 보인다.
+     */
+    armSpeed: 3.0 + pickUnit(hash, 8) * 6.0,
     armColor: lighten(body, 0.26),
   };
 }

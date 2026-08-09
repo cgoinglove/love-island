@@ -1,4 +1,3 @@
-import { shoreRadiusAt } from "@/game/core/island";
 import type { ReactionKind } from "@/shared/presence";
 import type { Vec2XZ } from "@/shared/types";
 
@@ -101,27 +100,34 @@ export function shellsToFire(
       if (!passed) continue;
 
       /**
-       * 어디서 터질까.
+       * 어디서 터질까 — **깃발보다 먼 바다**에서.
        *
-       * ⚠ 섬 중심 기준 고정 반지름(46~70m)으로 뿌렸더니 하나도 안 보였다.
-       *   카메라에서 100m 가까이 떨어지는데, 그 거리에서 곡률이 13m 를 끌어내려
-       *   터지는 지점이 수평선 아래로 가라앉기 때문이다.
+       * 예전엔 해안선 바로 바깥(섬 중심 기준 25~32m)에서 터뜨렸다. 그러다 보니
+       * 정북 58m 에 서 있는 배너보다 카메라에 가까워서, 폭죽이 **깃발 앞에서**
+       * 터지는 그림이 됐다. 하늘의 불꽃이 깃발을 가리면 그건 하늘이 아니라
+       * 깃발과 카메라 사이에 낀 무언가다 — 원근이 통째로 어긋나 보인다.
        *
-       * **해안선에서 일정 거리 바깥**으로 잡으면 어느 방향이든 물 위이면서
-       * 카메라에서 가깝다. 그리고 카메라가 북쪽을 보므로 북쪽 절반에만 띄운다 —
-       * 남쪽에 쏘면 등 뒤에서 터진다.
-       */
-      /**
-       * 방위는 **정북 ±40°** 다.
+       * 지금은 배너보다 뒤(64~78m)다. 겹쳐도 깃발이 앞이라 자연스럽게 가려진다.
        *
-       * 북쪽 절반(180°)에 고루 뿌렸더니 대부분이 화면 밖에서 터졌다 —
-       * 카메라의 가로 화각이 ±30° 남짓이라 그 바깥은 아무도 못 본다.
-       * 살짝 넓게 잡아 가장자리에서 올라오는 발도 남긴다.
+       * ⚠ 멀리 보내려면 **터지는 높이도 같이 올려야 한다.** 곡률이 거리 제곱으로
+       *   끌어내리기 때문이다(110m 에서 16m). 예전에 46~70m 로 보냈다가 하나도
+       *   안 보였던 게 그 높이를 안 올렸기 때문이었다 — 거리 자체가 문제가 아니었다.
+       *   높이는 `shellSpeedFor(power)` 가 규모와 함께 올려준다.
        */
       const NORTH = Math.PI * 1.5;
-      const angle = NORTH + (hashUnit(seed + shell, 0x51ed) - 0.5) * 1.4;
-      const radius =
-        shoreRadiusAt(angle) + 3 + hashUnit(seed + shell, 0x2be7) * 7;
+
+      /**
+       * 방위는 정북 **±12°~42°** — 가운데를 비워둔다.
+       *
+       * 카메라의 가로 화각이 ±33° 남짓이라 그 바깥은 아무도 못 본다(그래서 42° 상한).
+       * 그리고 정북 한가운데는 배너가 서 있는 자리다. 뒤에서 터지니 가려도 이상하진
+       * 않지만, 매번 깃발 뒤에서만 터지면 연출이 반쯤 낭비된다 — 양옆으로 비켜 쏘면
+       * 깃발을 가운데 두고 좌우에서 피어오르는 그림이 된다.
+       */
+      const side = hashUnit(seed + shell, 0x9c17) < 0.5 ? -1 : 1;
+      const bearing = 0.21 + hashUnit(seed + shell, 0x51ed) * 0.52;
+      const angle = NORTH + side * bearing;
+      const radius = 64 + hashUnit(seed + shell, 0x2be7) * 14;
 
       shots.push({
         key: `${day}:${showIndex}:${shell}`,

@@ -21,7 +21,8 @@ import { type CharacterLook, lookOf } from "./characterLook";
  * 외형은 playerId 로 정해지고 종류가 유한하다. 같은 모습이 두 번 나오면 지오메트리를
  * 재사용한다 — 사람이 늘어도 GPU 버퍼는 **모습의 가짓수**만큼만 늘어난다.
  */
-const BODY_RADIUS = 0.3;
+/** 몸통 굵기. 팔이 여기 닿아 있어야 붙어 보인다 — characterGeometry.test.ts 참고. */
+export const BODY_RADIUS = 0.3;
 const BODY_LENGTH = 0.46;
 const BODY_CENTER_Y = BODY_RADIUS + BODY_LENGTH / 2;
 
@@ -49,15 +50,22 @@ function keyOf(look: CharacterLook): string {
  * 몸에 병합하지 않는다 — 흔들려야 하니까. 캐릭터당 드로우콜 둘이 늘지만,
  * 가만히 서 있는 인형과 팔을 흔드는 인형은 살아 있는 정도가 다르다.
  * 어깨가 원점이라 쓰는 쪽에서 그룹을 돌리면 팔이 어깨에서 돈다.
+ *
+ * ⚠ 캡슐이 **어깨보다 위로 조금 더 올라온다**(위 끝이 로컬 +0.055).
+ *
+ * 팔이 내려가 있을 땐 몸통에 파묻혀 있어서 이게 없어도 붙어 보였다. 그런데 팔을
+ * 옆으로 들어 올리면 어깨를 축으로 회전하면서 캡슐 위 끝이 축 바깥으로 돌아 나가,
+ * 몸통(반지름 0.3)과 팔 사이에 4~5cm 틈이 생겼다 — **팔이 떨어져 보였다.**
+ * 축 근처를 채워두면 어느 각도로 돌아가든 그 부분이 몸통 안에 남는다.
  */
 let armGeometry: BufferGeometry | null = null;
 
 export function getArmGeometry(): BufferGeometry {
   armGeometry ??= mergeColored([
     {
-      geometry: new CapsuleGeometry(0.085, 0.3, 4, 8),
+      geometry: new CapsuleGeometry(0.085, 0.36, 4, 8),
       color: "#ffffff",
-      position: [0, -0.24, 0],
+      position: [0, -0.21, 0],
     },
   ]);
   return armGeometry;
@@ -66,8 +74,11 @@ export function getArmGeometry(): BufferGeometry {
 /** 어깨가 붙는 자리. 몸통 옆, 조금 위. */
 export function shoulderOf(seed: string): { x: number; y: number } {
   const look = lookOf(seed);
-  // 몸통 반지름(0.3)보다 조금 바깥. 실루엣이 갈라져야 팔로 읽힌다.
-  return { x: 0.34, y: BODY_CENTER_Y + 0.18 * look.bodyScale };
+  /**
+   * 몸통 반지름(0.3)보다 살짝 안쪽. 팔 굵기(0.085)가 있어서 이래도 실루엣은 갈라진다.
+   * 0.34 였을 땐 팔을 들었을 때 어깨 축이 몸통 바깥에 있어서 틈이 벌어졌다.
+   */
+  return { x: 0.32, y: BODY_CENTER_Y + 0.18 * look.bodyScale };
 }
 
 export function characterGeometryFor(seed: string): BufferGeometry {

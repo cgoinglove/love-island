@@ -169,15 +169,22 @@ describe("buildBurst", () => {
   it("폭죽이 카메라에 담기는 높이에서 터진다", () => {
     /**
      * 카메라가 23° 숙이고 세로 화각이 40° 라, 화면에서 하늘로 보이는 띠는
-     * 수평 아래 3°~14° 뿐이다. 70m 거리로 환산하면 지면 기준 0.5m ~ 15m.
-     * 규모를 아무리 키워도 터지는 높이는 그 한가운데 있어야 한다 —
-     * 규모는 높이가 아니라 **퍼지는 반지름**으로 낸다.
+     * 수평 아래 3°~14° 뿐이다. 터지는 높이는 그 안에 들어와야 한다.
+     *
+     * 규모가 클수록 높이가 조금 오르는 건 취향이 아니라 **거리 보정**이다 —
+     * 밤의 큰 발은 깃발보다 먼 바다(64~78m)에서 터지고, 곡률이 거리 제곱으로
+     * 끌어내리므로(110m 에서 16m) 같은 높이면 수평선 아래로 가라앉는다.
+     * 규모는 여전히 높이가 아니라 **퍼지는 반지름**으로 낸다.
      */
     for (const power of [1, 2, 3]) {
       const height = fireworkBurstHeight(power);
       expect(height, `power ${power}`).toBeGreaterThan(6.5);
-      expect(height, `power ${power}`).toBeLessThan(9.5);
+      expect(height, `power ${power}`).toBeLessThan(12);
     }
+    // 사람이 누른 한 발은 제 발밑에서 터진다 — 거리 보정이 필요 없다.
+    expect(fireworkBurstHeight(1)).toBeLessThan(8);
+    // 밤의 큰 발은 확실히 더 높이 오른다.
+    expect(fireworkBurstHeight(3)).toBeGreaterThan(fireworkBurstHeight(1) + 2);
   });
 
   it("규모를 키우면 더 크게 퍼진다", () => {

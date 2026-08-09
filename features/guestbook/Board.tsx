@@ -37,8 +37,11 @@ export function Board() {
     approachPoint: MAILBOX_APPROACH,
     radius: 2.8,
     label: "방명록 남기기",
-    // 판 꼭대기(1.15 + 2.5)보다 위. 이름표가 포스트잇을 가리면 안 된다.
-    labelHeight: 4.3,
+    /**
+     * 판 꼭대기(1.15 + 2.5)보다 위. 이름표가 포스트잇을 가리면 안 된다.
+     * 다만 더 올리면 그 위에 뜬 바다 배너의 문구를 가린다 — 둘 사이의 좁은 띠다.
+     */
+    labelHeight: 3.9,
     onInteract: () => useHudStore.getState().openPanel(GUESTBOOK_PANEL_ID),
   });
 

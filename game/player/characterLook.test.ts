@@ -43,8 +43,12 @@ describe("lookOf", () => {
     const speeds = new Set(ids(40).map((id) => lookOf(id).armSpeed.toFixed(2)));
     expect(speeds.size).toBeGreaterThan(30);
     for (const id of ids(40)) {
-      expect(lookOf(id).armSpeed).toBeGreaterThan(1);
-      expect(lookOf(id).armSpeed).toBeLessThan(4);
+      /**
+       * 한 번 들었다 내리는 주기가 2π/속도 다. 가장 느린 캐릭터도 2.1초 안에
+       * 한 번은 올려야 "움직이는 중"으로 보인다 — 1.2 였을 땐 5초가 걸렸다.
+       */
+      expect(lookOf(id).armSpeed).toBeGreaterThan(2.5);
+      expect(lookOf(id).armSpeed).toBeLessThan(10);
     }
   });
 
