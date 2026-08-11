@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { SIGN } from "@/components/island/ui";
 import { usePlayerController } from "@/game/core/playerControl";
 import { usePresenceStore } from "@/game/net/presence";
-import { OWNER_NAME, SITE_NAME } from "@/shared/constants";
+import { OWNER_NAME } from "@/shared/constants";
+import { LOCALES } from "@/shared/i18n";
+import { currentLocale, t } from "@/shared/strings";
 import { ChatComposer } from "./ChatComposer";
 import { InteractionPrompt } from "./InteractionPrompt";
 import { Shortcuts } from "./Shortcuts";
-import { StampCard } from "./StampCard";
 import { useHudStore } from "./store";
 import { TouchControls } from "./TouchControls";
 
@@ -74,22 +75,45 @@ export function Hud({ minimap }: { minimap?: React.ReactNode }) {
         <div className={`flex items-center gap-2.5 px-3.5 py-2 ${SIGN}`}>
           <span className="size-2.5 animate-pulse rounded-full bg-[#5e9c55] ring-2 ring-[#4a3428]" />
           <span className="font-bold text-[14px] text-[#3a2a22]">
-            {SITE_NAME}
+            {t().siteName}
           </span>
           <span className="h-4 w-[2px] rounded bg-[#d9c9a8]" />
           <span className="font-bold text-[13px] text-[#8a7460] tabular-nums">
-            {online}명
+            {t().hud.online(online)}
           </span>
           {direct > 0 && (
             <span className="rounded-full bg-[#5e9c55] px-2 py-0.5 font-bold text-[10px] text-[#fdf6e8]">
               p2p
             </span>
           )}
+
+          {/*
+            언어 전환.
+
+            ⚠ `<a>` 다 — 클라이언트 라우팅으로 넘어가면 언어가 안 바뀐다.
+              언어는 씬이 뜨기 **전에** 한 번 정해지는 값이라(shared/strings.ts),
+              같은 씬을 유지한 채 URL 만 갈면 이미 그려진 문구가 그대로 남는다.
+              통째로 새로 여는 게 이 설계에서는 맞는 동작이다.
+          */}
+          <span className="pointer-events-auto flex items-center gap-1">
+            {LOCALES.map((code) => (
+              <a
+                key={code}
+                href={code === "ko" ? "/" : `/${code}`}
+                className={`rounded-md px-1.5 py-0.5 font-bold text-[10px] uppercase tracking-wide transition ${
+                  code === currentLocale()
+                    ? "bg-[#4a3428] text-[#fdf6e8]"
+                    : "text-[#a8967f] hover:text-[#3a2a22]"
+                }`}
+              >
+                {code}
+              </a>
+            ))}
+          </span>
         </div>
       </header>
 
       {minimap}
-      <StampCard />
       <InteractionPrompt />
       {!panelOpen && <ChatComposer />}
       {!panelOpen && <TouchControls />}

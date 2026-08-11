@@ -4,12 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Panel } from "@/components/island/Panel";
 import { CHUNKY, SIGN, SIGN_ACCENT } from "@/components/island/ui";
 import { usePlayerController } from "@/game/core/playerControl";
-import {
-  isUnlocked,
-  STAMP_GOAL,
-  STAMPS,
-  useStampStore,
-} from "@/game/hud/stamps";
 import { useHudStore } from "@/game/hud/store";
 import { setNickname as rememberNickname } from "@/game/net/useNickname";
 import {
@@ -19,6 +13,7 @@ import {
   ROOM_ISLAND,
 } from "@/shared/constants";
 import { createGuestbookInput, type GuestbookEntry } from "@/shared/guestbook";
+import { currentLocale, t } from "@/shared/strings";
 import { postGuestbookEntry, useGuestbookFeed } from "./api";
 import { GUESTBOOK_PANEL_ID } from "./constants";
 
@@ -56,8 +51,6 @@ export function GuestbookPanel() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
-  const earned = useStampStore((state) => state.earned);
-  const unlocked = isUnlocked(earned);
 
   // 지난번에 쓴 이름을 꺼내온다. 두 번째 방문에 또 이름을 치게 하지 않는다.
   useEffect(() => {
@@ -82,7 +75,7 @@ export function GuestbookPanel() {
     });
 
     if (!parsed.success) {
-      setFormError(parsed.error.issues[0]?.message ?? "다시 확인해주세요.");
+      setFormError(parsed.error.issues[0]?.message ?? t().guestbook.recheck);
       return;
     }
 
@@ -105,7 +98,7 @@ export function GuestbookPanel() {
       setFormError(
         submitError instanceof Error
           ? submitError.message
-          : "쪽지를 남기지 못했습니다.",
+          : t().guestbook.failedPost,
       );
     } finally {
       setSubmitting(false);
@@ -122,7 +115,7 @@ export function GuestbookPanel() {
         <input
           value={nickname}
           onChange={(event) => setNickname(event.target.value)}
-          placeholder="이름"
+          placeholder={t().guestbook.namePlaceholder}
           maxLength={NICKNAME_MAX}
           className="w-full rounded-xl border-2 border-[#d9c9a8] bg-[#fdf6e8] px-3.5 py-2.5 font-medium text-[15px] text-[#3a2a22] outline-none transition placeholder:text-[#a8967f] focus:border-[#e8734a] sm:w-40"
         />
@@ -132,7 +125,7 @@ export function GuestbookPanel() {
             autoFocus
             value={message}
             onChange={(event) => setMessage(event.target.value)}
-            placeholder="한 마디 남기고 가세요"
+            placeholder={t().guestbook.messagePlaceholder}
             rows={2}
             maxLength={MESSAGE_MAX}
             className="w-full resize-none rounded-xl border-2 border-[#d9c9a8] bg-[#fdf6e8] px-3.5 py-2.5 font-medium text-[15px] text-[#3a2a22] outline-none transition placeholder:text-[#a8967f] focus:border-[#e8734a]"
@@ -155,7 +148,7 @@ export function GuestbookPanel() {
           onClick={() => setComposing(false)}
           className={`px-4 py-2.5 font-bold text-[14px] ${SIGN} ${CHUNKY}`}
         >
-          취소
+          {t().guestbook.cancel}
         </button>
         <button
           type="submit"
@@ -166,46 +159,27 @@ export function GuestbookPanel() {
           }
           className={`flex-1 py-2.5 font-bold text-[15px] ${SIGN_ACCENT} ${CHUNKY} disabled:cursor-not-allowed disabled:opacity-45`}
         >
-          {submitting ? "남기는 중…" : "쪽지 남기기"}
+          {submitting ? t().guestbook.submitting : t().guestbook.submit}
         </button>
       </div>
     </form>
-  ) : unlocked ? (
+  ) : (
     <button
       type="button"
       onClick={() => setComposing(true)}
       className={`flex w-full items-center justify-center gap-2 py-3 font-bold text-[15px] ${SIGN_ACCENT} ${CHUNKY} hover:brightness-[1.05]`}
     >
-      쪽지 붙이기
+      {t().guestbook.compose}
     </button>
-  ) : (
-    /**
-     * 읽기는 열어두고 **쓰기만** 막는다. 남의 쪽지는 볼 수 있어야
-     * "여기 사람들이 다녀갔구나" 가 전달되고, 그게 쓰고 싶게 만든다.
-     */
-    <div className="rounded-xl bg-[#f2e9d6] px-4 py-3 text-center">
-      <p className="font-bold text-[14px] text-[#3a2a22]">
-        쪽지를 붙이려면 도장 {STAMP_GOAL}개가 필요해요
-      </p>
-      <p className="mt-1 font-medium text-[12px] text-[#8a7460]">
-        {STAMPS.filter((s) => !earned[s.id])
-          .map((s) => s.hint)
-          .join(" · ")}
-      </p>
-    </div>
   );
 
   return (
     <Panel
       open={isOpen}
       onClose={closePanel}
-      slug="방명록 게시판"
-      title="방명록"
-      subtitle={
-        feed.entries.length > 0
-          ? `${feed.entries.length}${feed.hasMore ? "+" : ""}개의 쪽지 · 쓴 자리에 떨어집니다`
-          : "쪽지는 지금 서 있는 자리에 떨어집니다"
-      }
+      slug={t().guestbook.slug}
+      title={t().guestbook.title}
+      subtitle={t().guestbook.subtitle(feed.entries.length, feed.hasMore)}
       /**
        * 코르크판이 화면을 통째로 덮는다. 3D 로 서 있는 게시판과 **같은 재료**여야
        * 걸어가서 연 화면이 다른 물건으로 안 보인다.
@@ -261,7 +235,7 @@ function Board({ feed }: { feed: ReturnType<typeof useGuestbookFeed> }) {
   if (feed.isLoading) {
     return (
       <p className="px-5 py-16 text-center font-bold text-[14px] text-[#6b4a2a]">
-        불러오는 중…
+        {t().guestbook.loading}
       </p>
     );
   }
@@ -269,7 +243,7 @@ function Board({ feed }: { feed: ReturnType<typeof useGuestbookFeed> }) {
   if (feed.error) {
     return (
       <p className="px-5 py-16 text-center font-bold text-[14px] text-[#8c2f1a]">
-        방명록을 불러오지 못했습니다.
+        {t().guestbook.failed}
       </p>
     );
   }
@@ -278,10 +252,10 @@ function Board({ feed }: { feed: ReturnType<typeof useGuestbookFeed> }) {
     return (
       <div className="px-5 py-20 text-center">
         <p className="font-bold text-[16px] text-[#6b4a2a]">
-          아직 아무도 다녀가지 않았어요.
+          {t().guestbook.emptyTitle}
         </p>
         <p className="mt-1.5 font-medium text-[13px] text-[#8a6540]">
-          첫 쪽지를 붙여주세요
+          {t().guestbook.emptyHint}
         </p>
       </div>
     );
@@ -311,12 +285,12 @@ function Board({ feed }: { feed: ReturnType<typeof useGuestbookFeed> }) {
 
       {isLoadingMore && (
         <p className="text-center font-bold text-[12px] text-[#6b4a2a]">
-          더 불러오는 중…
+          {t().guestbook.loadingMore}
         </p>
       )}
       {!hasMore && feed.entries.length > 6 && (
         <p className="text-center font-semibold text-[12px] text-[#6b4a2a]/60">
-          여기까지예요
+          {t().guestbook.end}
         </p>
       )}
     </div>
@@ -381,7 +355,10 @@ function NoteCard({ entry }: { entry: GuestbookEntry }) {
         </p>
 
         <p className="mt-3 font-semibold text-[10px] text-[#3a2a22]/35">
-          {entry.posX.toFixed(0)}, {entry.posZ.toFixed(0)} 에서
+          {t().guestbook.at(
+            Number(entry.posX.toFixed(0)),
+            Number(entry.posZ.toFixed(0)),
+          )}
         </p>
       </div>
     </article>
@@ -392,11 +369,16 @@ function formatDate(iso: string): string {
   const date = new Date(iso);
   const elapsed = Date.now() - date.getTime();
   const minutes = Math.floor(elapsed / 60_000);
-  if (minutes < 1) return "방금";
-  if (minutes < 60) return `${minutes}분 전`;
+  const strings = t().guestbook;
+  if (minutes < 1) return strings.justNow;
+  if (minutes < 60) return strings.minutesAgo(minutes);
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}시간 전`;
+  if (hours < 24) return strings.hoursAgo(hours);
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}일 전`;
-  return date.toLocaleDateString("ko-KR", { month: "long", day: "numeric" });
+  if (days < 7) return strings.daysAgo(days);
+  // 일주일이 넘으면 상대 시간이 의미를 잃는다. 날짜는 브라우저가 언어대로 찍는다.
+  return date.toLocaleDateString(currentLocale(), {
+    month: "long",
+    day: "numeric",
+  });
 }

@@ -7,6 +7,7 @@ import { elevationAt } from "@/game/core/island";
 import { usePlayerController } from "@/game/core/playerControl";
 import { CurvedMaterial } from "@/game/world/curvature";
 import { mergeColored } from "@/game/world/meshKit";
+import { t } from "@/shared/strings";
 import {
   FISHING_APPROACH,
   FISHING_PANEL_ID,
@@ -65,7 +66,7 @@ export function FishingSpot() {
     position: FISHING_POSITION,
     approachPoint: FISHING_APPROACH,
     radius: 2.4,
-    label: "낚시하기",
+    label: t().fishing.label,
     labelHeight: 2.6,
     enabled: !fishing,
     /**

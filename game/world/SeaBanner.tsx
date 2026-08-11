@@ -11,7 +11,8 @@ import {
 } from "three";
 import CustomShaderMaterial from "three-custom-shader-material";
 import { SEA_BANNER } from "@/game/core/island";
-import { OWNER_NAME, SITE_NAME } from "@/shared/constants";
+import { OWNER_NAME } from "@/shared/constants";
+import { t } from "@/shared/strings";
 import { CurvedMaterial } from "./curvature";
 import { BANNER_VERTEX } from "./shaders";
 
@@ -79,27 +80,32 @@ const GAP = 52;
  *
  * 폭을 **재서** 가운데 놓기 때문에(paintBanner) 여기 문구를 바꿔도 여백이 안 무너진다.
  * 손으로 x 좌표를 박아뒀을 땐 이름이 조금만 길어져도 한쪽으로 쏠렸다.
+ *
+ * ⚠ 상수가 아니라 **함수**다. 모듈 상수로 두면 import 시점에 문구가 굳는데,
+ *   그때는 아직 언어가 안 정해져 있어서 영어로 들어와도 한글 배너가 그려진다.
  */
-const LINES = [
-  {
-    text: OWNER_NAME,
-    font: `bold ${1.35 * SCALE}px ui-monospace, "SFMono-Regular", monospace`,
-    color: "#2f6f4f",
-    y: 0.33,
-  },
-  {
-    text: SITE_NAME,
-    font: `bold ${0.8 * SCALE}px system-ui, sans-serif`,
-    color: "#6b4a2a",
-    y: 0.59,
-  },
-  {
-    text: "// 걸어서 갈 수 있는 이력서",
-    font: `${0.34 * SCALE}px ui-monospace, monospace`,
-    color: "#9b8a6a",
-    y: 0.79,
-  },
-] as const;
+function bannerLines() {
+  return [
+    {
+      text: OWNER_NAME,
+      font: `bold ${1.35 * SCALE}px ui-monospace, "SFMono-Regular", monospace`,
+      color: "#2f6f4f",
+      y: 0.33,
+    },
+    {
+      text: t().siteName,
+      font: `bold ${0.8 * SCALE}px system-ui, sans-serif`,
+      color: "#6b4a2a",
+      y: 0.59,
+    },
+    {
+      text: t().banner.tagline,
+      font: `${0.34 * SCALE}px ui-monospace, monospace`,
+      color: "#9b8a6a",
+      y: 0.79,
+    },
+  ];
+}
 
 /**
  * 배너 한 장을 그린다.
@@ -133,8 +139,9 @@ function paintBanner(
    * x 좌표를 손으로 박아뒀을 땐 이름이 조금만 길어져도 한쪽으로 쏠렸고,
    * 여백을 늘리려면 세 군데를 같이 고쳐야 했다. 폭을 재면 여백이 저절로 대칭이 된다.
    */
+  const lines = bannerLines();
   const textWidth = Math.max(
-    ...LINES.map((line) => {
+    ...lines.map((line) => {
       ctx.font = line.font;
       return ctx.measureText(line.text).width;
     }),
@@ -166,7 +173,7 @@ function paintBanner(
   // ── 글 ──
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  for (const line of LINES) {
+  for (const line of lines) {
     ctx.font = line.font;
     ctx.fillStyle = line.color;
     ctx.fillText(line.text, textX, CANVAS_H * line.y);

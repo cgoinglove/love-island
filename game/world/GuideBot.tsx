@@ -5,10 +5,11 @@ import { useFrame } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Group, Mesh } from "three";
 import {
-  BOT_IDLE_LINES,
   BOT_TOPICS,
   GREETING_KEY,
   IDLE_PREFIX,
+  idleCount,
+  labelOf,
   linesFor,
   topicById,
 } from "@/game/core/bot/script";
@@ -26,7 +27,6 @@ import {
 import { elevationAt } from "@/game/core/island";
 import { getIslandData } from "@/game/core/islandData";
 import { findPath } from "@/game/core/nav/astar";
-import { awardStamp } from "@/game/hud/stamps";
 import {
   emitRoomEvent,
   getMyPlayerId,
@@ -61,7 +61,7 @@ import type { Vec2XZ } from "@/shared/types";
  *
  * ── 확장하는 법 ──
  * 봇이 할 줄 아는 일을 늘리려면 `game/core/bot/script.ts` 의 BOT_TOPICS 에 한 줄
- * 더하면 된다. 여기 코드는 안 건드려도 된다 — 대사·목적지·도장이 전부 데이터다.
+ * 더하면 된다. 여기 코드는 안 건드려도 된다 — 대사와 목적지가 전부 데이터다.
  */
 
 /** 봇이 평소 서 있는 자리. 스폰에서 바로 보이는 거리에 둔다. */
@@ -238,17 +238,8 @@ export function GuideBot({
         topicId: wire.topic,
         requestedBy: wire.by,
       });
-
-      /**
-       * 도장은 **부탁한 사람에게만** 찍힌다. 옆에서 구경한 사람까지 찍히면
-       * 미션이 미션이 아니게 된다.
-       */
-      if (wire.by === myId && wire.topic) {
-        const topic = topicById(wire.topic);
-        if (topic?.awards) awardStamp(topic.awards);
-      }
     });
-  }, [owner, decide, myId]);
+  }, [owner, decide]);
 
   // ── 소유자: 봇의 판단 ──
   useFrame((_, delta) => {
@@ -376,7 +367,7 @@ export function GuideBot({
       elapsedMs < BOT_LINE_MS * live.current.decision.lines.length;
     if (!busy && now - lastChatter.current > IDLE_CHATTER_MS) {
       lastChatter.current = now;
-      const index = Math.floor(Math.random() * BOT_IDLE_LINES.length);
+      const index = Math.floor(Math.random() * idleCount());
       decide([pose.x, pose.z], `${IDLE_PREFIX}${index}`, null, null);
     }
   });
@@ -499,7 +490,7 @@ export function GuideBot({
                   onClick={() => ask(topic.id)}
                   className="rounded-full bg-[#fdf6e8] px-3.5 py-2 font-semibold text-[13px] text-[#3a2a22] shadow-[0_3px_10px_-3px_rgba(0,0,0,0.45)] transition active:translate-y-[1.5px]"
                 >
-                  {topic.label}
+                  {labelOf(topic.id)}
                 </button>
               ))}
             </div>

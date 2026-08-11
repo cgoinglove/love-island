@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { CHUNKY } from "@/components/island/ui";
 import { usePlayerController } from "@/game/core/playerControl";
+import { t } from "@/shared/strings";
 import { useHudStore } from "./store";
 import { useTouchMode } from "./touch";
 
@@ -31,12 +32,12 @@ export function TouchControls() {
       <Joystick />
       <div className="fixed right-5 bottom-8 z-20 flex flex-col items-center gap-3">
         <ActionButton
-          label="밀기"
+          label={t().hud.touchShove}
           className="bg-rose-500/90"
           onPress={() => controllerRef.current?.shove()}
         />
         <ActionButton
-          label="점프"
+          label={t().hud.touchJump}
           className="bg-sky-500/90"
           onPress={() => controllerRef.current?.setVirtualJump(true)}
           onRelease={() => controllerRef.current?.setVirtualJump(false)}

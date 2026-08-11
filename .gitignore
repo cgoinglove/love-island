@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+
+# 사진 원본. public/ 에는 축소본만 올라간다 — 원본까지 배포되면 55MB 다.
+.originals/

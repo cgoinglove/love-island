@@ -22,12 +22,14 @@ export const REWARD_TIERS = ["junk", "real"] as const;
 export type RewardTier = (typeof REWARD_TIERS)[number];
 
 export interface Catchable {
+  /**
+   * 이름과 설명은 여기 없다 — `shared/strings.ts` 의 `fishing.catchables[id]` 에 있다.
+   * 표는 확률과 규칙이고 문구는 언어를 타므로, 둘을 같이 두면 언어를 추가할 때마다
+   * 확률표를 건드려야 한다. **DB 에 남는 것도 이 id 다.**
+   */
   id: string;
-  name: string;
   emoji: string;
   tier: RewardTier;
-  /** 잡았을 때 한 줄. 보상 설명이거나 농담이다. */
-  blurb: string;
   /**
    * 뽑기 가중치. 확률이 아니라 **무게**다 —
    * 항목을 하나 추가할 때 다른 값을 다시 계산할 필요가 없다.
@@ -45,59 +47,45 @@ export const CATCHABLES: readonly Catchable[] = [
    */
   {
     id: "nothing",
-    name: "빈 낚싯줄",
     emoji: "〰️",
     tier: "junk",
     weight: 150,
-    blurb: "아무것도 안 걸렸습니다. 이런 날도 있죠.",
   },
   {
     id: "boot",
-    name: "낡은 장화",
     emoji: "🥾",
     tier: "junk",
     weight: 140,
-    blurb: "한 짝뿐입니다. 나머지 한 짝은 어디 갔을까요.",
   },
   {
     id: "seaweed",
-    name: "미역 한 줌",
     emoji: "🌿",
     tier: "junk",
     weight: 130,
-    blurb: "국 끓이기엔 좀 모자랍니다.",
   },
   {
     id: "can",
-    name: "찌그러진 캔",
     emoji: "🥫",
     tier: "junk",
     weight: 120,
-    blurb: "누가 버린 걸까요. 주웠으니 치운 셈 칩시다.",
   },
   {
     id: "shell",
-    name: "조개껍데기",
     emoji: "🐚",
     tier: "junk",
     weight: 110,
-    blurb: "귀에 대면 파도 소리가… 사실 여기가 바다입니다.",
   },
   {
     id: "rock",
-    name: "그냥 돌",
     emoji: "🪨",
     tier: "junk",
     weight: 100,
-    blurb: "돌입니다. 정말 그냥 돌입니다.",
   },
   {
     id: "iou",
-    name: "차용증",
     emoji: "📜",
     tier: "junk",
     weight: 90,
-    blurb: '"커피는 네가 사라" 라고 적혀 있습니다. 주인장 필체네요.',
   },
 
   /**
@@ -106,12 +94,10 @@ export const CATCHABLES: readonly Catchable[] = [
    */
   {
     id: "americano",
-    name: "아메리카노 쿠폰",
     emoji: "☕",
     tier: "real",
     weight: 12,
     redeemable: true,
-    blurb: "주인장이 진짜로 삽니다. 이 화면을 캡처해서 보내세요.",
   },
 ];
 
@@ -119,6 +105,21 @@ export const TOTAL_WEIGHT = CATCHABLES.reduce(
   (sum, item) => sum + item.weight,
   0,
 );
+
+/**
+ * 진짜 보상이 나올 확률(%).
+ *
+ * 화면에 "1.4% 확률로 커피가 나옵니다" 라고 적어주려고 **표에서 계산한다.**
+ * 손으로 적어두면 무게를 만지는 순간 화면이 거짓말을 시작하는데, 그 거짓말은
+ * 아무도 못 알아챈다 — 확률은 눈으로 검산할 수 있는 종류의 값이 아니다.
+ */
+export const REAL_CHANCE_PERCENT =
+  (CATCHABLES.filter((item) => item.tier === "real").reduce(
+    (sum, item) => sum + item.weight,
+    0,
+  ) /
+    TOTAL_WEIGHT) *
+  100;
 
 export function catchableById(id: string): Catchable | undefined {
   return CATCHABLES.find((item) => item.id === id);

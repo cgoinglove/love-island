@@ -8,20 +8,8 @@ import {
   WOOD_HEADER,
   WOOD_PANEL,
 } from "@/components/island/ui";
+import { t } from "@/shared/strings";
 import { useTouchMode } from "./touch";
-
-const KEYS: ReadonlyArray<{ key: string; action: string }> = [
-  { key: "탭", action: "그 자리로 걸어가기" },
-  { key: "WASD", action: "직접 이동" },
-  { key: "Shift", action: "달리기" },
-  { key: "Space", action: "점프" },
-  { key: "F", action: "밀치기" },
-  { key: "E", action: "가까운 것과 상호작용" },
-  { key: "Enter", action: "말 걸기" },
-  { key: "1 2 3", action: "하트 · 폭죽 · 축포" },
-  { key: "cgoing-bot", action: "안내 봇에게 말 걸기" },
-  { key: "?", action: "이 목록" },
-];
 
 /**
  * 단축키 표. `?` 로 열고 닫는다.
@@ -67,7 +55,7 @@ export function Shortcuts() {
         type="button"
         onClick={() => setOpen((value) => !value)}
         className={`fixed bottom-5 left-5 z-20 size-10 font-bold text-[16px] hover:brightness-[1.04] ${SIGN} ${CHUNKY}`}
-        aria-label="단축키"
+        aria-label={t().hud.shortcutsAria}
       >
         ?
       </button>
@@ -76,7 +64,7 @@ export function Shortcuts() {
         <div className="fade-in fixed inset-0 z-30 flex animate-in items-center justify-center p-4">
           <button
             type="button"
-            aria-label="닫기"
+            aria-label={t().hud.close}
             onClick={() => setOpen(false)}
             className={`absolute inset-0 cursor-default ${BACKDROP} backdrop-blur-[2px]`}
           />
@@ -84,11 +72,11 @@ export function Shortcuts() {
             className={`zoom-in-95 relative w-full max-w-sm animate-in overflow-hidden rounded-3xl ${WOOD_PANEL}`}
           >
             <p className={`px-5 py-2.5 font-bold text-[13px] ${WOOD_HEADER}`}>
-              조작법
+              {t().hud.shortcutsTitle}
             </p>
             <div className="p-5">
               <dl className="grid gap-2">
-                {KEYS.map((item) => (
+                {t().hud.shortcuts.map((item) => (
                   <div key={item.key} className="flex items-center gap-3">
                     <dt className="w-20 shrink-0">
                       <kbd className="inline-block rounded-lg bg-[#e5d7bd] px-2 py-1 font-bold text-[12px] text-[#4a3428] shadow-[0_2px_0_0_#c4b193]">

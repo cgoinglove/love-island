@@ -6,6 +6,7 @@ import { elevationAt } from "@/game/core/island";
 import { usePlayerController } from "@/game/core/playerControl";
 import { useHudStore } from "@/game/hud/store";
 import { CurvedMaterial } from "@/game/world/curvature";
+import { t } from "@/shared/strings";
 import {
   CAREER_PANEL_ID,
   MONUMENT_APPROACH,
@@ -47,7 +48,7 @@ export function Desk() {
     position: MONUMENT_POSITION,
     approachPoint: MONUMENT_APPROACH,
     radius: 3,
-    label: "경력 및 프로젝트",
+    label: t().career.label,
     onInteract: () => useHudStore.getState().openPanel(CAREER_PANEL_ID),
   });
 

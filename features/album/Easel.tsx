@@ -7,14 +7,15 @@ import { elevationAt } from "@/game/core/island";
 import { usePlayerController } from "@/game/core/playerControl";
 import { useHudStore } from "@/game/hud/store";
 import { CurvedMaterial } from "@/game/world/curvature";
+import { t } from "@/shared/strings";
 import { ALBUM_PANEL_ID, EASEL_APPROACH, EASEL_POSITION } from "./constants";
-import { PHOTOS } from "./content";
+import { PHOTO_SWATCHES } from "./content";
 
 const [X, Z] = EASEL_POSITION;
 const Y = elevationAt(X, Z);
 
 /** 액자 벽에 걸리는 사진 수. 실제 사진첩은 패널에서 전부 본다. */
-const PREVIEW = PHOTOS.slice(0, 4);
+const PREVIEW = PHOTO_SWATCHES.slice(0, 4);
 
 /**
  * 사진첩. 야외에 세워둔 액자 벽이다.
@@ -28,7 +29,7 @@ export function Easel() {
     position: EASEL_POSITION,
     approachPoint: EASEL_APPROACH,
     radius: 3,
-    label: "사진첩 보기",
+    label: t().album.label,
     onInteract: () => useHudStore.getState().openPanel(ALBUM_PANEL_ID),
   });
 
@@ -69,10 +70,11 @@ export function Easel() {
 
       {/* 걸린 사진들. 각자 다른 높이·기울기로 매달려야 "널어둔 것"이 된다 */}
       {PREVIEW.map((photo, index) => {
-        const t = index / (PREVIEW.length - 1);
-        const px = -1.35 + t * 2.7;
+        // 이름이 `t` 였는데 문구 사전(`t()`)과 겹쳐서 바꿨다.
+        const along = index / (PREVIEW.length - 1);
+        const px = -1.35 + along * 2.7;
         // 매다는 높이는 줄의 처짐을 따라간다.
-        const py = 2.22 - Math.sin(Math.PI * t) * 0.34;
+        const py = 2.22 - Math.sin(Math.PI * along) * 0.34;
         const tilt = [0.09, -0.13, 0.05, -0.08][index] ?? 0;
         return (
           <group

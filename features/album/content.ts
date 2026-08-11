@@ -6,4 +6,4 @@
  */
 
 export type { Photo } from "@/shared/content";
-export { ALBUM_INTRO, PHOTOS } from "@/shared/content";
+export { albumIntroOf, PHOTO_SWATCHES, photosOf } from "@/shared/content";

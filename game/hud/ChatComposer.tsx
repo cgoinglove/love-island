@@ -6,6 +6,7 @@ import { CHUNKY, SIGN, SIGN_ACCENT } from "@/components/island/ui";
 import { emitRoomEvent } from "@/game/net/presence";
 import { CHAT_MAX } from "@/shared/constants";
 import { REACTION_COOLDOWN_MS, type ReactionKind } from "@/shared/presence";
+import { t } from "@/shared/strings";
 import { useHudStore } from "./store";
 import { useTouchMode } from "./touch";
 
@@ -14,28 +15,24 @@ const EMOTES = ["👋", "🙂", "🎉", "❤️", "😮", "🔥"] as const;
 const REACTIONS: readonly {
   kind: ReactionKind;
   icon: string;
-  label: string;
   key: string;
   tint: string;
 }[] = [
   {
     kind: "heart",
     icon: "♥",
-    label: "하트",
     key: "1",
     tint: "bg-[#ffe3e9] text-[#c2185b] border-[#e8a0b4]",
   },
   {
     kind: "firework",
     icon: "✸",
-    label: "폭죽",
     key: "2",
     tint: "bg-[#fff0cc] text-[#b7791f] border-[#e0bd7a]",
   },
   {
     kind: "confetti",
     icon: "✦",
-    label: "축포",
     key: "3",
     tint: "bg-[#d9f0fa] text-[#1f6f8f] border-[#8fc6dc]",
   },
@@ -146,7 +143,7 @@ export function ChatComposer() {
               <button
                 key={item.kind}
                 type="button"
-                aria-label={item.label}
+                aria-label={t().hud.reactions[item.kind]}
                 onPointerDown={(event) => {
                   event.preventDefault();
                   react(item.kind);
@@ -160,7 +157,7 @@ export function ChatComposer() {
 
           <button
             type="button"
-            aria-label="말 걸기"
+            aria-label={t().hud.chatOpen}
             onClick={openInput}
             className={`${SIGN} ${CHUNKY} -translate-x-1/2 fixed bottom-[max(2.25rem,env(safe-area-inset-bottom))] left-1/2 z-20 flex size-14 items-center justify-center`}
           >
@@ -182,7 +179,8 @@ export function ChatComposer() {
           onClick={openInput}
           className={`${SIGN} ${CHUNKY} flex shrink-0 items-center gap-2 whitespace-nowrap px-5 py-2.5 font-bold text-[15px] hover:brightness-[1.04]`}
         >
-          <span className="text-[#e8734a]">💬</span>말 걸기
+          <span className="text-[#e8734a]">💬</span>
+          {t().hud.chatOpen}
           <kbd className="rounded-md bg-[#e5d7bd] px-1.5 py-0.5 font-semibold text-[11px] text-[#6b5442]">
             Enter
           </kbd>
@@ -195,7 +193,7 @@ export function ChatComposer() {
             <button
               key={item.kind}
               type="button"
-              title={`${item.label} (${item.key})`}
+              title={`${t().hud.reactions[item.kind]} (${item.key})`}
               onClick={() => react(item.kind)}
               className={`${CHUNKY} relative flex size-10 items-center justify-center rounded-xl text-[18px] ring-2 ring-[#4a3428] hover:brightness-[1.06] ${item.tint}`}
             >
@@ -253,7 +251,7 @@ export function ChatComposer() {
               close();
             }
           }}
-          placeholder="한 마디 하고 지나가기…"
+          placeholder={t().hud.chatPlaceholder}
           className="min-w-0 flex-1 bg-transparent font-medium text-[15px] text-[#3a2a22] outline-none placeholder:text-[#a8967f]"
         />
         {/*
@@ -262,7 +260,7 @@ export function ChatComposer() {
         */}
         <button
           type="button"
-          aria-label="보내기"
+          aria-label={t().hud.send}
           onMouseDown={(event) => event.preventDefault()}
           onClick={send}
           className={`${SIGN_ACCENT} ${CHUNKY} flex size-9 shrink-0 items-center justify-center rounded-full hover:brightness-[1.05]`}

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { PHOTOS } from "@/shared/content";
+import { photosOf } from "@/shared/content";
 
 /**
  * 원고와 **파일 시스템** 사이의 약속.
@@ -15,7 +15,7 @@ describe("content/ 와 public/ 의 약속", () => {
      * 경로를 적어놓고 파일을 안 넣으면 화면에 깨진 이미지가 뜬다.
      * src 를 아예 안 적는 건 괜찮다 — 그건 tint 카드로 대체된다.
      */
-    for (const photo of PHOTOS) {
+    for (const photo of photosOf("ko")) {
       if (!photo.src) continue;
       expect(() => readFileSync(`public${photo.src}`), photo.src).not.toThrow();
     }

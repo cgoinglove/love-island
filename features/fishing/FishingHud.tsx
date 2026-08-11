@@ -2,12 +2,16 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { CHUNKY, SIGN, SIGN_ACCENT } from "@/components/island/ui";
-import { awardStamp } from "@/game/hud/stamps";
 import { getMyPlayerId } from "@/game/net/presence";
 import { serverNow } from "@/game/net/serverClock";
 import { ROOM_ISLAND } from "@/shared/constants";
-import { OWNER } from "@/shared/content";
-import { catchableById, catchResult } from "@/shared/fishing";
+import { OWNER_CONTACT } from "@/shared/content";
+import {
+  catchableById,
+  catchResult,
+  REAL_CHANCE_PERCENT,
+} from "@/shared/fishing";
+import { currentLocale, type Dict, t } from "@/shared/strings";
 import {
   BITE_WINDOW_MS,
   CAST_SECONDS,
@@ -87,7 +91,7 @@ export function FishingHud() {
       });
 
       if (response.status === 429) {
-        setError("오늘은 이 정도만. 한 시간 뒤에 다시 오세요.");
+        setError(t().fishing.rateLimited);
         return;
       }
       if (!response.ok) throw new Error(String(response.status));
@@ -97,11 +101,9 @@ export function FishingHud() {
       if (!item) throw new Error("모르는 물건");
 
       setCaught({ item, code: parsed.code, at: parsed.caughtAt });
-      // 잡든 못 잡든 "던져봤다" 가 도장 조건이다. 운으로 미션을 막으면 안 된다.
-      awardStamp("fished");
     } catch (caughtError) {
       console.error("[fishing] 실패", caughtError);
-      setError("줄이 끊어졌습니다. 다시 던져보세요.");
+      setError(t().fishing.lineSnapped);
     }
   }, [clearTimers, set, setCaught, setError]);
 
@@ -142,7 +144,7 @@ export function FishingHud() {
           onClick={leave}
           className={`${SIGN} ${CHUNKY} px-3.5 py-2 font-bold text-[13px]`}
         >
-          그만
+          {t().fishing.quit}
         </button>
       </div>
     </div>
@@ -173,13 +175,13 @@ function Prompt({
   }
 
   if (stage === "casting") {
-    return <Still text="던지는 중…" />;
+    return <Still text={t().fishing.casting} />;
   }
   if (stage === "waiting") {
-    return <Still text="기다리는 중… 찌를 보세요" />;
+    return <Still text={t().fishing.waiting} />;
   }
   if (stage === "reeling") {
-    return <Still text="끌어올리는 중…" />;
+    return <Still text={t().fishing.reeling} />;
   }
   if (stage === "bite") {
     return (
@@ -188,7 +190,7 @@ function Prompt({
         onClick={onReel}
         className={`${SIGN_ACCENT} ${CHUNKY} animate-pulse px-8 py-3 font-black text-[17px]`}
       >
-        지금! (Space)
+        {t().fishing.now}
       </button>
     );
   }
@@ -200,10 +202,10 @@ function Prompt({
       className={`${SIGN_ACCENT} ${CHUNKY} px-7 py-2.5 font-bold text-[15px]`}
     >
       {stage === "missed"
-        ? "놓쳤어요 — 다시 던지기"
+        ? t().fishing.missed
         : stage === "caught"
-          ? "한 번 더 (Space)"
-          : "던지기 (Space)"}
+          ? t().fishing.again
+          : t().fishing.cast}
     </button>
   );
 }
@@ -218,14 +220,16 @@ function Still({ text }: { text: string }) {
  * 잡은 것.
  *
  * 걸린 건 딱 두 가지다 — **꽝**, 그리고 아주 드물게 진짜 커피 쿠폰.
- * 그래서 꽝일 때는 크게 "꽝" 이라고 쓰고, 바로 아래에 그 위에 뭐가 있는지 알려준다.
- * 뭘 노리는지 모르면 한 번 던져보고 끝이다.
+ * 그래서 꽝일 때는 크게 "꽝" 이라고 쓰고, 바로 아래에 확률 한 줄만 붙인다.
+ * 뭘 노리는지 모르면 한 번 던져보고 끝이고, 확률을 알면 한 번 더 던진다.
  */
 function CatchCard() {
   const caught = useFishingStore((state) => state.caught);
   if (!caught) return null;
   const { item, code, at } = caught;
   const blank = item.tier !== "real";
+  const copy =
+    t().fishing.catchables[item.id as keyof Dict["fishing"]["catchables"]];
 
   return (
     <div
@@ -233,21 +237,18 @@ function CatchCard() {
     >
       {blank && (
         <p className="font-black text-[13px] text-[#b08968] tracking-[0.3em]">
-          꽝
+          {t().fishing.blank}
         </p>
       )}
       <span className="text-[40px] leading-none">{item.emoji}</span>
-      <p className="mt-1 font-bold text-[17px] text-[#3a2a22]">{item.name}</p>
+      <p className="mt-1 font-bold text-[17px] text-[#3a2a22]">{copy?.name}</p>
       <p className="mt-1 font-medium text-[13px] text-[#8a7460]">
-        {item.blurb}
+        {copy?.blurb}
       </p>
 
       {blank && (
         <p className="mt-3 rounded-xl bg-[#f3e8d6] px-3 py-2 font-semibold text-[12px] text-[#6b5442] leading-relaxed">
-          ☕ 이 위에 딱 하나, <b className="text-[#c2562f]">아메리카노 쿠폰</b>
-          이 있습니다.
-          <br />
-          주인장이 진짜로 사줍니다. 한 번 더 던져보세요.
+          ☕ {t().fishing.odds(REAL_CHANCE_PERCENT.toFixed(1))}
         </p>
       )}
 
@@ -258,18 +259,16 @@ function CatchCard() {
          */
         <div className="mt-3 rounded-2xl border-2 border-[#e8734a] border-dashed bg-[#fff6ef] px-4 py-3">
           <p className="font-bold text-[11px] text-[#c2562f] tracking-widest">
-            교환 코드
+            {t().fishing.couponTitle}
           </p>
           <p className="mt-0.5 font-black text-[24px] text-[#3a2a22] tracking-[0.15em] tabular-nums">
             {code}
           </p>
           <p className="mt-1 font-medium text-[11px] text-[#8a7460]">
-            {new Date(at).toLocaleString("ko-KR")}
+            {new Date(at).toLocaleString(currentLocale())}
           </p>
           <p className="mt-2 font-semibold text-[12px] text-[#5c4a3c] leading-relaxed">
-            이 화면을 캡처해서{" "}
-            <span className="font-bold text-[#c2562f]">{OWNER.contact}</span>{" "}
-            으로 보내주세요. 진짜로 삽니다.
+            {t().fishing.couponHowTo(OWNER_CONTACT)}
           </p>
         </div>
       )}

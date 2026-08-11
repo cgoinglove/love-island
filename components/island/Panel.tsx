@@ -4,12 +4,14 @@ import { ChevronLeft } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import { CHUNKY, WOOD_HEADER } from "@/components/island/ui";
 import { cn } from "@/lib/utils";
+import { t } from "@/shared/strings";
 
 export interface PanelProps {
   open: boolean;
-  /** 머리띠 왼쪽에 박히는 짧은 이름. 예: "경력 수첩" */
-  slug: string;
-  title: string;
+  /** 머리띠 가운데에 박히는 짧은 이름. `bare` 면 안 쓴다. */
+  slug?: string;
+  /** 본문 맨 위 큰 제목. `fill` 이나 `bare` 면 안 쓴다. */
+  title?: string;
   subtitle?: string;
   onClose: () => void;
   children: ReactNode;
@@ -24,6 +26,23 @@ export interface PanelProps {
    * 기본값은 글 읽기에 좋은 폭이고, 사진첩처럼 좁은 단을 쓰는 화면은 이걸 바꾼다.
    */
   titleClassName?: string;
+  /**
+   * 제목 줄과 스크롤을 걷어내고 children 이 남은 높이를 **다 쓰게** 한다.
+   *
+   * 노트북 화면(iframe)처럼 "스크롤되는 글" 이 아니라 "화면에 꽉 차는 물건" 이
+   * 들어올 때 쓴다. 스크롤 컨테이너 안에 높이 100% 짜리를 넣으면 높이가 0 이 된다.
+   */
+  fill?: boolean;
+  /**
+   * 나무 머리띠까지 걷어내고 **화면을 통째로** children 에게 넘긴다.
+   *
+   * 노트북처럼 그 자체가 하나의 화면인 것에 쓴다. 섬의 머리띠와 브라우저 바가
+   * 위아래로 겹치면 창 안에 창이 든 꼴이라, 노트북을 보는 게 아니라
+   * **노트북 스크린샷을 띄운 패널**을 보게 된다.
+   *
+   * ⚠ 이 모드에서는 나가는 길도 children 이 만들어야 한다. Esc 는 그대로 먹는다.
+   */
+  bare?: boolean;
 }
 
 /**
@@ -52,6 +71,8 @@ export function Panel({
   action,
   footer,
   titleClassName = "max-w-5xl",
+  fill = false,
+  bare = false,
 }: PanelProps) {
   useEffect(() => {
     if (!open) return;
@@ -87,26 +108,29 @@ export function Panel({
         전체화면에서는 X 하나보다 **뒤로가기**가 맞다 — 창을 닫는 게 아니라
         섬으로 돌아가는 것이기 때문이다.
       */}
-      <header
-        className={`flex shrink-0 items-center gap-2 px-3 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] ${WOOD_HEADER}`}
-      >
-        <button
-          type="button"
-          onClick={onClose}
-          className={`${CHUNKY} -ml-1 flex items-center gap-1 rounded-xl py-1.5 pr-3 pl-1.5 font-bold text-[14px] text-[#fdf6e8] transition hover:bg-[#fdf6e8]/15`}
+      {!bare && (
+        <header
+          className={`flex shrink-0 items-center gap-2 px-3 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] ${WOOD_HEADER}`}
         >
-          <ChevronLeft className="size-5" />
-          섬으로
-        </button>
-        <span className="min-w-0 flex-1 truncate text-center font-bold text-[13px] text-[#fdf6e8]/75 tracking-wide">
-          {slug}
-        </span>
-        <div className="flex min-w-[5.5rem] justify-end">{action}</div>
-      </header>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`${CHUNKY} -ml-1 flex items-center gap-1 rounded-xl py-1.5 pr-3 pl-1.5 font-bold text-[14px] text-[#fdf6e8] transition hover:bg-[#fdf6e8]/15`}
+          >
+            <ChevronLeft className="size-5" />
+            {t().panel.back}
+          </button>
+          <span className="min-w-0 flex-1 truncate text-center font-bold text-[13px] text-[#fdf6e8]/75 tracking-wide">
+            {slug}
+          </span>
+          <div className="flex min-w-[5.5rem] justify-end">{action}</div>
+        </header>
+      )}
 
       <div
         className={cn(
-          "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+          "flex min-h-0 flex-1 flex-col",
+          fill ? "overflow-hidden" : "overflow-y-auto overscroll-contain",
           surfaceClassName,
         )}
       >
@@ -114,21 +138,23 @@ export function Panel({
           제목은 스크롤과 함께 흘러간다. 전체화면에서 제목까지 고정하면
           작은 화면의 세로가 머리띠 둘로 반쯤 먹힌다.
         */}
-        <div
-          className={cn(
-            "mx-auto w-full px-5 pt-7 pb-5 sm:px-8",
-            titleClassName,
-          )}
-        >
-          <h2 className="font-bold text-[26px] text-[#3a2a22] sm:text-[32px]">
-            {title}
-          </h2>
-          {subtitle && (
-            <p className="mt-1.5 font-medium text-[14px] text-[#8a7460]">
-              {subtitle}
-            </p>
-          )}
-        </div>
+        {!fill && (
+          <div
+            className={cn(
+              "mx-auto w-full px-5 pt-7 pb-5 sm:px-8",
+              titleClassName,
+            )}
+          >
+            <h2 className="font-bold text-[26px] text-[#3a2a22] sm:text-[32px]">
+              {title}
+            </h2>
+            {subtitle && (
+              <p className="mt-1.5 font-medium text-[14px] text-[#8a7460]">
+                {subtitle}
+              </p>
+            )}
+          </div>
+        )}
 
         {children}
       </div>

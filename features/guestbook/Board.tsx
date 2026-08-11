@@ -5,6 +5,7 @@ import { elevationAt } from "@/game/core/island";
 import { usePlayerController } from "@/game/core/playerControl";
 import { useHudStore } from "@/game/hud/store";
 import { CurvedMaterial } from "@/game/world/curvature";
+import { t } from "@/shared/strings";
 import { createBoardGeometry } from "./boardGeometry";
 import {
   GUESTBOOK_PANEL_ID,
@@ -36,7 +37,7 @@ export function Board() {
     position: MAILBOX_POSITION,
     approachPoint: MAILBOX_APPROACH,
     radius: 2.8,
-    label: "방명록 남기기",
+    label: t().guestbook.label,
     /**
      * 판 꼭대기(1.15 + 2.5)보다 위. 이름표가 포스트잇을 가리면 안 된다.
      * 다만 더 올리면 그 위에 뜬 바다 배너의 문구를 가린다 — 둘 사이의 좁은 띠다.

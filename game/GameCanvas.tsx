@@ -11,7 +11,6 @@ import {
 } from "@/game/core/playerControl";
 import { PerfPanel, PerfProbe } from "@/game/dev/PerfHud";
 import { useTuning } from "@/game/dev/useTuning";
-import { ExploreWatcher } from "@/game/hud/ExploreWatcher";
 import { InteractableLabels } from "@/game/hud/InteractableLabels";
 import { InteractionWatcher } from "@/game/hud/InteractionWatcher";
 import { Minimap, MinimapFrame } from "@/game/hud/Minimap";
@@ -101,7 +100,6 @@ export function GameCanvas({ children, overlay }: GameCanvasProps) {
             />
             <RemotePlayers />
             <GuideBot playerRef={playerRef} />
-            <ExploreWatcher playerRef={playerRef} />
             <Reactions />
             <FollowCamera targetRef={playerRef} {...tuning.camera} />
 
