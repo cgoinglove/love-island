@@ -54,15 +54,6 @@ export function labelOf(id: TopicId): string {
   return t().bot.topics[id].label;
 }
 
-/** 인사와 혼잣말도 키를 갖는다. 그래야 대사를 안 보내고 키만 보낼 수 있다. */
-export const GREETING_KEY = "greeting";
-export const IDLE_PREFIX = "idle:";
-
-/** 혼잣말 가짓수. 소유자가 하나를 골라 그 번호를 보낸다. */
-export function idleCount(): number {
-  return t().bot.idle.length;
-}
-
 /**
  * 키 하나로 대사를 찾는다.
  *
@@ -77,13 +68,6 @@ export function idleCount(): number {
  */
 export function linesFor(key: string | null): readonly string[] {
   if (!key) return [];
-  const strings = t().bot;
-  if (key === GREETING_KEY) return strings.greeting;
-  if (key.startsWith(IDLE_PREFIX)) {
-    const index = Number(key.slice(IDLE_PREFIX.length));
-    const line = strings.idle[index];
-    return line ? [line] : [];
-  }
   const topic = topicById(key);
-  return topic ? strings.topics[topic.id].lines : [];
+  return topic ? t().bot.topics[topic.id].lines : [];
 }

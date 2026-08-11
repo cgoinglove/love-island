@@ -6,15 +6,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Group, Mesh } from "three";
 import {
   BOT_TOPICS,
-  GREETING_KEY,
-  IDLE_PREFIX,
-  idleCount,
   labelOf,
   linesFor,
   topicById,
 } from "@/game/core/bot/script";
 import {
-  BOT_LINE_MS,
   type BotDecision,
   currentLine,
   damp,
@@ -66,13 +62,6 @@ import type { Vec2XZ } from "@/shared/types";
 
 /** 봇이 평소 서 있는 자리. 스폰에서 바로 보이는 거리에 둔다. */
 const BOT_HOME: Vec2XZ = [4, 25];
-
-/** 이 거리 안에 사람이 들어오면 인사한다. */
-const GREET_RADIUS = 7;
-/** 한 번 인사한 사람에게 다시 인사하기까지의 간격(ms). */
-const GREET_COOLDOWN_MS = 90_000;
-/** 아무 일도 없을 때 혼잣말하는 간격(ms). */
-const IDLE_CHATTER_MS = 26_000;
 
 /** 봇의 외형 씨앗. 사람과 겹치지 않는 고정 값이라 늘 같은 모습이다. */
 const BOT_NAME = "cgoing-bot";
@@ -128,11 +117,7 @@ const STAND_STILL: BotDecision = {
   requestedBy: null,
 };
 
-export function GuideBot({
-  playerRef,
-}: {
-  playerRef: React.RefObject<Group | null>;
-}) {
+export function GuideBot() {
   const groupRef = useRef<Group>(null);
   const bodyRef = useRef<Group>(null);
   const ringRef = useRef<Mesh>(null);
@@ -172,10 +157,6 @@ export function GuideBot({
    * 그때부터는 안내가 아니라 잔소리다.
    */
   const [tried, setTried] = useState(false);
-
-  /** 소유자만 쓰는 기억. 누구에게 언제 인사했는지. */
-  const greeted = useRef(new Map<string, number>());
-  const lastChatter = useRef(0);
 
   /** 결정을 내리고 모두에게 알린다. 소유자만 부른다. */
   const decide = useCallback(
@@ -340,36 +321,16 @@ export function GuideBot({
     const next = currentLine(live.current.decision.lines, elapsedMs);
     setLine((prev) => (prev === next ? prev : next));
 
-    if (!owner) return;
-
-    // 인사: 가까이 온 사람에게, 오래 안 본 사람에게만.
-    const player = playerRef.current;
-    if (player) {
-      const distance = Math.hypot(
-        player.position.x - pose.x,
-        player.position.z - pose.z,
-      );
-      const lastGreet = greeted.current.get(myId) ?? 0;
-      if (
-        distance < GREET_RADIUS &&
-        now - lastGreet > GREET_COOLDOWN_MS &&
-        elapsedMs > BOT_LINE_MS * live.current.decision.lines.length
-      ) {
-        greeted.current.set(myId, now);
-        decide([pose.x, pose.z], GREETING_KEY, null, null);
-        return;
-      }
-    }
-
-    // 혼잣말: 할 일이 없을 때만. 안내 중에 끼어들면 안 된다.
-    const busy =
-      pose.moving ||
-      elapsedMs < BOT_LINE_MS * live.current.decision.lines.length;
-    if (!busy && now - lastChatter.current > IDLE_CHATTER_MS) {
-      lastChatter.current = now;
-      const index = Math.floor(Math.random() * idleCount());
-      decide([pose.x, pose.z], `${IDLE_PREFIX}${index}`, null, null);
-    }
+    /**
+     * ⚠ 봇은 **먼저 말을 걸지 않는다.**
+     *
+     * 가까이 오면 인사하고, 조용하면 혼잣말을 하게 해뒀었다. 데스크톱에서는 분위기였는데
+     * 폰에서는 재앙이었다 — 들어오자마자(스폰이 봇에서 5.7m 다) 세 줄짜리 말풍선이
+     * 화면 한복판을 덮고, 26초마다 또 덮었다. **묻지도 않았는데 화면을 가리는 것**은
+     * 안내가 아니라 방해다.
+     *
+     * 지금은 눌렀을 때만 말한다. 눌러야 한다는 건 머리 위 3D 커서가 알려준다.
+     */
   });
 
   const ask = useCallback((topicId: string) => {

@@ -38,6 +38,11 @@ const REACTIONS: readonly {
   },
 ];
 
+/** 종류로 바로 찾는 표. 폰의 단일 버튼이 방금 나간 것의 모습을 쓴다. */
+const REACTION_BY_KIND = Object.fromEntries(
+  REACTIONS.map((item) => [item.kind, item]),
+) as Record<ReactionKind, (typeof REACTIONS)[number]>;
+
 /**
  * 화면 아래 가운데의 조작 독 — 채팅 입력과 감정표현.
  *
@@ -77,12 +82,29 @@ export function ChatComposer() {
     (document.activeElement as HTMLElement | null)?.blur();
   }, []);
 
+  /**
+   * 마지막으로 나간 것. 버튼이 그 모습으로 바뀐다.
+   *
+   * 무작위인데 버튼이 늘 같은 모양이면 "눌러도 똑같은 게 나온다"로 읽힌다.
+   * 방금 뭐가 나갔는지 버튼이 보여주면 무작위라는 게 저절로 전달된다.
+   */
+  const [lastKind, setLastKind] = useState<ReactionKind>("heart");
+
   const react = useCallback((kind: ReactionKind) => {
     const now = Date.now();
     if (now - lastReaction.current < REACTION_COOLDOWN_MS) return;
     lastReaction.current = now;
     emitRoomEvent("fx", kind);
   }, []);
+
+  /** 셋 중 하나를 무작위로. 폰에서는 버튼이 하나뿐이다. */
+  const reactRandom = useCallback(() => {
+    const item =
+      REACTIONS[Math.floor(Math.random() * REACTIONS.length)] ?? REACTIONS[0];
+    if (!item) return;
+    setLastKind(item.kind);
+    react(item.kind);
+  }, [react]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -131,39 +153,37 @@ export function ChatComposer() {
      * 왼쪽 조이스틱, 오른쪽 점프·밀기. 데스크톱 배치(가운데 아래 한 줄)를
      * 그대로 두면 그 위에 정확히 겹쳐 앉는다.
      *
-     * 그래서 감정표현은 오른쪽 세로줄로 세워 액션 버튼 위에 쌓고,
-     * 말 걸기는 조이스틱과 액션 버튼 **사이 빈 자리**에 동그란 버튼 하나로 둔다.
-     * 글자를 빼고 아이콘만 남기는 건 그 틈이 좁아서다.
+     * 그래서 오른쪽 세로줄 하나에 **말 걸기와 감정표현 둘만** 세워 액션 버튼 위에 쌓는다.
+     * 감정표현 셋을 각각 두면 폰 세로 화면의 오른쪽이 버튼 다섯 줄로 덮여서
+     * 정작 섬이 안 보였다 — 하나로 합치고 셋 중 하나가 무작위로 나가게 했다.
+     * 어차피 셋 다 "반가움"을 내는 장치라, 고르는 재미보다 화면이 넓은 게 낫다.
      */
     if (touch) {
       return (
-        <>
-          <div className="fixed right-5 bottom-46 z-20 flex flex-col gap-2.5">
-            {REACTIONS.map((item) => (
-              <button
-                key={item.kind}
-                type="button"
-                aria-label={t().hud.reactions[item.kind]}
-                onPointerDown={(event) => {
-                  event.preventDefault();
-                  react(item.kind);
-                }}
-                className={`${CHUNKY} flex size-12 touch-none items-center justify-center rounded-full text-[20px] ring-2 ring-[#4a3428] ${item.tint}`}
-              >
-                {item.icon}
-              </button>
-            ))}
-          </div>
-
+        <div className="fixed right-5 bottom-46 z-20 flex flex-col gap-2.5">
           <button
             type="button"
             aria-label={t().hud.chatOpen}
             onClick={openInput}
-            className={`${SIGN} ${CHUNKY} -translate-x-1/2 fixed bottom-[max(2.25rem,env(safe-area-inset-bottom))] left-1/2 z-20 flex size-14 items-center justify-center`}
+            className={`${SIGN} ${CHUNKY} flex size-12 items-center justify-center rounded-full`}
           >
-            <MessageCircle className="size-6 text-[#e8734a]" />
+            <MessageCircle className="size-5.5 text-[#e8734a]" />
           </button>
-        </>
+
+          <button
+            type="button"
+            aria-label={t().hud.reactions[lastKind]}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              reactRandom();
+            }}
+            className={`${CHUNKY} flex size-12 touch-none items-center justify-center rounded-full text-[20px] ring-2 ring-[#4a3428] ${
+              REACTION_BY_KIND[lastKind].tint
+            }`}
+          >
+            {REACTION_BY_KIND[lastKind].icon}
+          </button>
+        </div>
       );
     }
 

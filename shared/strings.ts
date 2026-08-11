@@ -141,17 +141,6 @@ const ko = {
   },
 
   bot: {
-    greeting: [
-      "어서 오세요! 러브 아일랜드입니다.",
-      "저는 이 섬 안내를 맡고 있어요.",
-      "머리 위 버튼을 누르면 어디든 데려다 드릴게요.",
-    ],
-    idle: [
-      "여기 앉아 있으면 파도 소리가 잘 들려요.",
-      "누가 오면 말 걸어주세요. 안내는 제 일이니까요.",
-      "저 야자수, 흔들면 뭔가 떨어질지도 몰라요.",
-      "밤이 오면 별이 꽤 많이 보입니다.",
-    ],
     topics: {
       controls: {
         label: "조작법 알려줘",
@@ -329,17 +318,6 @@ const en: Dict = {
   },
 
   bot: {
-    greeting: [
-      "Welcome! This is Love Island.",
-      "I show people around here.",
-      "Tap the button over my head and I'll take you anywhere.",
-    ],
-    idle: [
-      "Sit here a while and you can really hear the waves.",
-      "Come say hi — showing people around is my job.",
-      "Shake that palm tree. Something might fall out.",
-      "Quite a few stars come out at night.",
-    ],
     topics: {
       controls: {
         label: "How do I move?",

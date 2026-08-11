@@ -99,7 +99,7 @@ export function GameCanvas({ children, overlay }: GameCanvasProps) {
               config={tuning.move}
             />
             <RemotePlayers />
-            <GuideBot playerRef={playerRef} />
+            <GuideBot />
             <Reactions />
             <FollowCamera targetRef={playerRef} {...tuning.camera} />
 
