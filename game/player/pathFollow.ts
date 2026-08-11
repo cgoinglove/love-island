@@ -78,9 +78,17 @@ export function followPath(
     // 마지막 지점은 더 정확히 밟아야 approachPoint 가 의미를 갖는다.
     const threshold = isLast ? waypointRadius * 0.5 : waypointRadius;
 
-    if (lengthXZ(dx, dz) > threshold) {
-      follower.axis[0] = dx;
-      follower.axis[1] = dz;
+    const distance = lengthXZ(dx, dz);
+    if (distance > threshold) {
+      /**
+       * **단위 벡터**로 돌려준다 — 여기서 나가는 건 "얼마나 멀리"가 아니라 "어느 쪽"이다.
+       *
+       * 예전엔 남은 거리를 그대로 실어 보냈다. 시뮬레이션이 어차피 정규화하니 결과가
+       * 같았기 때문인데, 조이스틱을 아날로그로 만들면서 **축의 길이가 세기**가 됐다.
+       * 그대로 뒀으면 웨이포인트가 0.5m 간격일 때 탭 이동이 반 속도로 걸었을 것이다.
+       */
+      follower.axis[0] = dx / distance;
+      follower.axis[1] = dz / distance;
       return follower.axis;
     }
     follower.index++;

@@ -133,13 +133,27 @@ export function stepPlayer(
 ): void {
   const [dirX, dirZ] = normalizeXZ(intent.axis[0], intent.axis[1]);
   const hasInput = dirX !== 0 || dirZ !== 0;
+
+  /**
+   * 축의 **길이가 세기**다. 살짝 밀면 살살 걷는다.
+   *
+   * 예전엔 방향만 쓰고 길이를 버렸다. 키보드는 어차피 켜짐/꺼짐이라 티가 안 났는데,
+   * 조이스틱에서는 **손가락을 얼마나 밀든 늘 최고 속도**였다 — 폰에서 이동이
+   * 너무 빠르다고 느껴진 이유의 절반이 이것이다. 살살 걷는 방법이 아예 없었다.
+   *
+   * 1 을 넘는 건 자른다. 키보드 대각선은 (1,1) 이라 길이가 1.41 이고,
+   * 그걸 그대로 쓰면 대각선으로 갈 때만 빨라진다.
+   */
+  const strength = Math.min(1, lengthXZ(intent.axis[0], intent.axis[1]));
   const topSpeed =
     config.maxSpeed * (intent.sprint ? config.sprintMultiplier : 1);
+  /** 지금 이 입력이 향하는 속도. 세기를 여기에만 곱한다 — 아래 상한에는 안 곱한다. */
+  const driveSpeed = topSpeed * strength;
 
   if (hasInput) {
     const step = config.accel * dt;
-    state.vx = moveToward(state.vx, dirX * topSpeed, step);
-    state.vz = moveToward(state.vz, dirZ * topSpeed, step);
+    state.vx = moveToward(state.vx, dirX * driveSpeed, step);
+    state.vz = moveToward(state.vz, dirZ * driveSpeed, step);
   } else {
     // 공중에서는 마찰이 거의 없어야 점프가 "날아가는" 느낌이 난다.
     const step = config.friction * dt * (state.grounded ? 1 : 0.12);
@@ -148,16 +162,20 @@ export function stepPlayer(
   }
 
   /**
-   * 대각선으로 두 축이 동시에 최고 속도에 닿으면 √2 배 빨라진다. 여기서 잘라낸다.
-   * 단, 넉백으로 밀린 속도는 잘라내면 안 되므로 상한을 넉넉히 둔다.
+   * ⚠ 여기 속도 상한이 있었다. 그리고 **그게 넉백을 먹고 있었다.**
+   *
+   * 원래 목적은 "대각선으로 두 축이 동시에 최고 속도에 닿으면 √2 배 빨라진다" 였는데,
+   * 축을 정규화해 방향으로 쓰는 지금은 그 일이 애초에 안 일어난다 —
+   * `dirX·drive, dirZ·drive` 의 길이는 언제나 정확히 drive 다. 상한은 남은 흔적이었다.
+   *
+   * 남아 있는 동안 한 일은 하나뿐이었다: 밀쳐진 사람의 속도를 공중에서 25m/s 로,
+   * 착지하는 순간 10m/s 로 잘라버리는 것. 그래서 `SHOVE_IMPULSE` 를 26 에서 32 로
+   * 올려도 날아가는 거리가 7.8m 에서 8.5m 로밖에 안 늘었다 — **숫자를 아무리 만져도
+   * 안 통하는 이유가 여기 있었다.** 밀려나는 속도를 멈추는 일은 마찰이 하면 된다.
+   *
+   * (기존 테스트가 `vx > maxSpeed * 1.5` 만 봤기 때문에 25 로 잘려도 통과했다.
+   *  지금은 "멀리 날아간다" 가 거리로 본다.)
    */
-  const speed = lengthXZ(state.vx, state.vz);
-  const cap = Math.max(topSpeed, state.grounded ? topSpeed : topSpeed * 2.5);
-  if (speed > cap) {
-    const scale = cap / speed;
-    state.vx *= scale;
-    state.vz *= scale;
-  }
 
   // ── 수직 ──────────────────────────────────────────────
   if (intent.jump && state.grounded) {

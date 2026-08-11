@@ -1,6 +1,6 @@
 "use client";
 
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { Leva } from "leva";
 import { type ReactNode, Suspense, useRef } from "react";
 import { type Group, NeutralToneMapping } from "three";
@@ -39,6 +39,25 @@ export interface GameCanvasProps {
   children?: ReactNode;
   /** 캔버스 위에 얹힐 2D 레이어. HUD 와 feature 패널. */
   overlay?: ReactNode;
+  /** 첫 프레임이 그려졌을 때. 로딩 화면을 여기서 걷는다. */
+  onReady: () => void;
+}
+
+/**
+ * 첫 프레임이 실제로 그려진 순간을 알린다.
+ *
+ * 청크가 로드된 시점(dynamic 의 loading 이 끝나는 시점)은 아직 검은 화면이다.
+ * WebGL 컨텍스트가 서고 지오메트리가 올라가고 **한 장이 그려진 뒤**라야 도착이다.
+ * 그 전에 로딩 화면을 걷으면 빈 화면이 한 박자 보인다.
+ */
+function FirstFrame({ onReady }: { onReady: () => void }) {
+  const fired = useRef(false);
+  useFrame(() => {
+    if (fired.current) return;
+    fired.current = true;
+    onReady();
+  });
+  return null;
 }
 
 /**
@@ -47,7 +66,7 @@ export interface GameCanvasProps {
  * 이 컴포넌트는 feature 를 하나도 모른다 — children 으로 받을 뿐이다.
  * game/ 이 features/ 를 import 하면 린트가 막는다. 합성은 app/ 에서 한다. (기획서 §2.2)
  */
-export function GameCanvas({ children, overlay }: GameCanvasProps) {
+export function GameCanvas({ children, overlay, onReady }: GameCanvasProps) {
   const playerRef = useRef<Group>(null);
   const controllerRef = useRef<PlayerController | null>(null);
   const perfRef = useRef<HTMLPreElement>(null);
@@ -112,6 +131,7 @@ export function GameCanvas({ children, overlay }: GameCanvasProps) {
             */}
             <InteractableLabels />
           </PlayerControllerContext.Provider>
+          <FirstFrame onReady={onReady} />
           <PerfProbe target={perfRef} />
         </Suspense>
       </Canvas>

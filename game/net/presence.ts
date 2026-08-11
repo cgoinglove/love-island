@@ -16,12 +16,14 @@ import {
   RTC_POSE_INTERVAL_MS,
   roomEvent as roomEventSchema,
 } from "@/shared/presence";
+import { nextBeatDelay } from "./beatRate";
 import {
   lastSnapshotTime,
   type Pose,
   pushSnapshot,
   type Snapshot,
 } from "./interpolation";
+import { logSummary } from "./netLog";
 import { handleRoomEvent, reflectOwnEvent } from "./roomEvents";
 import { noteServerTime } from "./serverClock";
 import { createRtcMesh } from "./webrtc";
@@ -122,14 +124,11 @@ function safeJson(raw: string): unknown {
   }
 }
 
-/** 이 값보다 적게 움직였으면 "가만히 있다"로 본다 (dead reckoning). */
-const MOVED_EPSILON = 0.05;
-
 /** 응답에 이 시간 동안 안 보이면 화면에서 지운다. 잠깐의 패킷 유실은 견디는 길이. */
 const PEER_DROP_MS = 2500;
 
-/** 악수가 오가는 중에는 왕복이 빨라야 연결이 빨리 붙는다. */
-const HANDSHAKE_INTERVAL_MS = 60;
+/** 접속 상태 요약을 콘솔에 찍는 간격(ms). */
+const SUMMARY_INTERVAL_MS = 10_000;
 
 function ensurePeer(playerId: string, nickname: string | null): Peer {
   let peer = peers.get(playerId);
@@ -156,8 +155,6 @@ export function startPresence(getSelf: () => SelfSnapshot | null): () => void {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let failures = 0;
-  let sentX = Number.NaN;
-  let sentZ = Number.NaN;
 
   /** 다음 beat 에 실어 보낼 악수 메시지. */
   const outbox: OutgoingSignal[] = [];
@@ -165,6 +162,8 @@ export function startPresence(getSelf: () => SelfSnapshot | null): () => void {
   const eventOutbox: OutgoingRoomEvent[] = [];
   /** 마지막으로 본 사건 순번. */
   let cursor = 0;
+  /** 마지막 요약을 찍은 시각. 상태가 아니라 **주기**로 찍는다 — 콘솔을 안 더럽히려고. */
+  let lastSummaryAt = 0;
 
   const mesh = createRtcMesh(playerId, {
     onPose(peerId, pose) {
@@ -201,20 +200,20 @@ export function startPresence(getSelf: () => SelfSnapshot | null): () => void {
     timer = setTimeout(beat, delay);
   };
 
-  /**
-   * 다음 폴링까지의 간격.
-   *
-   * **모든 상대와 P2P 가 붙었으면 폴링은 더 이상 좌표를 나르지 않는다** —
-   * 새 방문자를 발견하고 내가 살아있다고 알리는 용도만 남으므로 3초로 늦춘다.
-   * WebRTC 를 붙인 값어치가 서버 비용으로 나타나는 지점이 여기다.
-   */
-  function nextDelay(moved: boolean, handshaking: boolean): number {
-    if (handshaking || outbox.length > 0 || eventOutbox.length > 0) {
-      return HANDSHAKE_INTERVAL_MS;
+  /** 다음 폴링까지의 간격. 판단은 순수 함수에 있다(beatRate.ts). */
+  function nextDelay(handshaking: boolean): number {
+    let relaying = false;
+    for (const peer of peers.values()) {
+      if (!peer.direct) {
+        relaying = true;
+        break;
+      }
     }
-    if (!moved) return PRESENCE_IDLE_INTERVAL_MS;
-    const allDirect = peers.size > 0 && mesh.connectedCount() >= peers.size;
-    return allDirect ? PRESENCE_IDLE_INTERVAL_MS : PRESENCE_ACTIVE_INTERVAL_MS;
+    return nextBeatDelay({
+      handshaking,
+      pending: outbox.length > 0 || eventOutbox.length > 0,
+      relaying,
+    });
   }
 
   function applyPeers(
@@ -299,14 +298,11 @@ export function startPresence(getSelf: () => SelfSnapshot | null): () => void {
       return;
     }
 
-    const moved =
-      Number.isNaN(sentX) ||
-      Math.hypot(self.x - sentX, self.z - sentZ) > MOVED_EPSILON;
-
     // 이번 요청에 실어 보낼 악수 메시지와 사건을 꺼내 간다.
     const signals = outbox.splice(0, outbox.length);
     const events = eventOutbox.splice(0, eventOutbox.length);
 
+    const sentAt = performance.now();
     try {
       const response = await fetch("/api/presence", {
         method: "POST",
@@ -340,10 +336,26 @@ export function startPresence(getSelf: () => SelfSnapshot | null): () => void {
       for (const event of body.events) handleRoomEvent(event, playerId);
       cursor = Math.max(cursor, body.cursor);
 
-      sentX = self.x;
-      sentZ = self.z;
       failures = 0;
-      schedule(nextDelay(moved, body.signals.length > 0));
+      const delay = nextDelay(body.signals.length > 0);
+
+      /**
+       * 10초에 한 번 요약. 아무도 없으면 안 찍는다.
+       * 숫자 셋이 함께 있어야 진단이 된다 — 사람이 있는데 폴링 주기가 200ms 라면
+       * 그건 폴백으로 돌고 있다는 뜻이고, 3000ms 라면 좌표가 P2P 로 가고 있다는 뜻이다.
+       */
+      const now = performance.now();
+      if (peers.size > 0 && now - lastSummaryAt > SUMMARY_INTERVAL_MS) {
+        lastSummaryAt = now;
+        logSummary({
+          peers: peers.size,
+          direct: mesh.connectedCount(),
+          intervalMs: delay,
+          rttMs: Math.round(now - sentAt),
+        });
+      }
+
+      schedule(delay);
     } catch {
       // 보내지 못한 것들은 되돌려 놓는다. 악수를 잃으면 연결이 영영 안 붙는다.
       outbox.unshift(...signals);

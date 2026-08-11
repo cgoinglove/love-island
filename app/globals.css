@@ -129,3 +129,47 @@
     @apply font-sans;
   }
 }
+
+/**
+ * 로딩 화면의 배. 왼쪽 밖에서 오른쪽 밖으로 건너간다.
+ * 가운데서 살짝 뜨는 건 파도 때문이다 — 일정한 높이로 미끄러지면 배가 아니라 아이콘이다.
+ */
+@keyframes boarding-sail {
+  0% {
+    left: -8%;
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(4deg);
+  }
+  100% {
+    left: 100%;
+    transform: translateY(0) rotate(-4deg);
+  }
+}
+
+/**
+ * 조작하는 것에는 글자 선택이 없다.
+ *
+ * ⚠ 폰에서 버튼을 조금만 오래 눌러도 글자가 선택되면서 파란 블록이 뜨고,
+ *   그 뒤로는 탭이 그 선택에 먹혀서 **버튼이 안 눌렸다.** 게임 조작에서 글자를
+ *   드래그할 일은 없는데, 브라우저 기본값은 문서를 읽는 화면을 가정한다.
+ *
+ * 읽는 화면은 그대로 둔다 — 방명록 쪽지나 낚시 쿠폰 코드는 복사할 수 있어야 한다.
+ * 그래서 전역으로 끄지 않고 **누르는 것들에만** 건다.
+ */
+button,
+kbd,
+canvas,
+[role="button"] {
+  -webkit-user-select: none;
+  user-select: none;
+  /* 길게 누를 때 뜨는 iOS 의 미리보기·복사 팝업도 막는다. */
+  -webkit-touch-callout: none;
+}
+
+button,
+[role="button"] {
+  /* 더블탭 확대와 그에 딸린 300ms 지연을 없앤다. 둘 다 조작에는 방해다. */
+  touch-action: manipulation;
+}

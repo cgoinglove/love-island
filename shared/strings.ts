@@ -46,6 +46,25 @@ const ko = {
     back: "섬으로",
   },
 
+  /**
+   * 섬으로 들어가는 동안 뜨는 화면.
+   *
+   * ⚠ 이 문구만은 `t()` 로 읽으면 안 된다. 씬이 아직 안 뜬 시점이라 서버에서도
+   *   그려지는데, 전역 언어를 서버에서 읽으면 요청끼리 섞일 수 있다.
+   *   `stringsFor(locale)` 로 **언어를 손에 들고** 읽는다.
+   */
+  boarding: {
+    title: "러브 아일랜드로 이동 중",
+    subtitle: "잠시만 기다려주세요",
+    tips: [
+      "바닥을 탭하면 그리로 걸어갑니다.",
+      "cgoing-bot 을 누르면 어디든 데려다 줍니다.",
+      "섬 남쪽 끝에서 낚시를 할 수 있어요.",
+      "밤이 되면 바다 위로 폭죽이 올라갑니다.",
+      "1 · 2 · 3 을 누르면 하트와 폭죽이 터집니다.",
+    ],
+  },
+
   career: {
     label: "경력 및 프로젝트",
     /** 접속하는 동안 뜨는 한 줄. 뒤에 주소가 붙는다. */
@@ -220,6 +239,18 @@ const en: Dict = {
 
   panel: {
     back: "Island",
+  },
+
+  boarding: {
+    title: "Sailing to Love Island",
+    subtitle: "Hang tight",
+    tips: [
+      "Tap the ground and you'll walk there.",
+      "Tap cgoing-bot and it will take you anywhere.",
+      "You can fish at the southern tip of the island.",
+      "When night falls, fireworks go up over the sea.",
+      "Press 1 · 2 · 3 for hearts and fireworks.",
+    ],
   },
 
   career: {

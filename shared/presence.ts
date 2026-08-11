@@ -174,6 +174,14 @@ export const PRESENCE_TTL_SECONDS = 12;
 /** 움직이는 동안의 전송 주기(ms). 서버 호출 수와 부드러움의 맞바꿈. */
 export const PRESENCE_ACTIVE_INTERVAL_MS = 200;
 
+/**
+ * 악수가 오가는 중의 간격(ms).
+ *
+ * offer → answer → ICE 후보들이 전부 이 폴링에 실려 다닌다. 왕복 한 번이 곧
+ * 연결이 붙기까지의 시간이라, 여기가 느리면 P2P 가 성사되기 전에 사람이 나간다.
+ */
+export const PRESENCE_HANDSHAKE_INTERVAL_MS = 60;
+
 /** 가만히 서 있을 때의 전송 주기(ms). "아직 여기 있다"만 알리면 된다. */
 export const PRESENCE_IDLE_INTERVAL_MS = 3000;
 
@@ -196,9 +204,16 @@ export const RTC_POSE_INTERVAL_MS = 50;
  */
 export const RTC_INTERP_DELAY_MS = 120;
 
-/** 밀치기가 닿는 거리(m)와 각도(라디안). 뒤에서 오는 건 안 맞는다. */
-export const SHOVE_RANGE = 2.8;
-export const SHOVE_ARC = Math.PI * 0.75;
+/**
+ * 밀치기가 닿는 거리(m)와 각도(라디안). 뒤에서 오는 건 안 맞는다.
+ *
+ * 2.8m · 135° 였을 때 "왜 이렇게 어렵냐" 는 말을 들었다. 서로 움직이는 중이라
+ * 2.8m 는 **한 걸음이면 벗어나는 거리**고, 그 안에 들어온 순간에 각도까지 맞아야 했다.
+ * 밀치기는 정밀 조작이 아니라 장난이라 판정이 후해야 한다 — 4.2m · 180° 면
+ * "앞에 있으면 맞는다" 가 되고, 그게 이 기능에 기대하는 감각이다.
+ */
+export const SHOVE_RANGE = 4.2;
+export const SHOVE_ARC = Math.PI;
 /**
  * 밀치기 세기. 수평 속도와 살짝 띄우는 속도.
  *
@@ -207,10 +222,15 @@ export const SHOVE_ARC = Math.PI * 0.75;
  *   "밀렸다"가 읽히려면 제 발로 가는 것보다 확실히 빨라야 한다 — 걷기의 2.6배로 잡는다.
  *   띄우는 속도도 중력을 따라간다. 중력 40 에서 6.0 이면 체공 0.3초 · 정점 0.45m 다.
  */
-export const SHOVE_IMPULSE = 26;
-export const SHOVE_LIFT = 6.0;
-/** 연타 방지. */
-export const SHOVE_COOLDOWN_MS = 700;
+export const SHOVE_IMPULSE = 32;
+export const SHOVE_LIFT = 7.0;
+/**
+ * 연타 방지.
+ *
+ * 700ms 는 한 번 놓치면 다시 노리기까지 상대가 이미 가버리는 간격이었다.
+ * 맞히기 쉬워진 만큼 다시 휘두르기도 쉬워야 주고받는 맛이 난다.
+ */
+export const SHOVE_COOLDOWN_MS = 450;
 
 /** 말풍선이 머리 위에 떠 있는 시간(ms). */
 export const CHAT_BUBBLE_MS = 6000;

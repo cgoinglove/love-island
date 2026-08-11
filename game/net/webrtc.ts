@@ -1,5 +1,6 @@
 "use client";
 
+import { logDirect, logFallback, logPeerFound, logPeerGone } from "./netLog";
 import {
   type DecodedPose,
   decodePose,
@@ -26,6 +27,14 @@ const ICE_SERVERS: RTCIceServer[] = [
 export type SignalKind = "offer" | "answer" | "ice";
 
 /**
+ * 이만큼 안 열리면 "폴백으로 돌고 있다" 고 콘솔에 알린다(ms).
+ *
+ * 연결을 포기하는 게 아니라 **알리기만** 한다 — 늦게라도 붙으면 그때 성공 로그가 찍힌다.
+ * 잘 되는 망에서는 1~2초면 붙으므로, 이 시간을 넘겼다면 대개 안 붙는 망이다.
+ */
+const FALLBACK_NOTICE_MS = 8000;
+
+/**
  * DataChannel 첫 바이트는 메시지 종류다.
  * 좌표는 초당 20번 오는 6바이트짜리이고, 사건은 가끔 오는 JSON 이라
  * 채널을 두 개 파는 대신 태그 한 바이트로 구분한다.
@@ -47,6 +56,12 @@ interface PeerLink {
   channel: RTCDataChannel | null;
   /** 원격 description 이 붙기 전에 도착한 ICE 후보를 잠시 담아둔다. */
   pendingCandidates: RTCIceCandidateInit[];
+  /** 악수를 시작한 시각. 얼마나 걸려 붙었는지(또는 못 붙었는지) 재는 데 쓴다. */
+  startedAt: number;
+  /** 한 번이라도 열린 적이 있는가. 실패 로그를 두 번 찍지 않으려고 기억한다. */
+  opened: boolean;
+  /** 이만큼 지나도 안 열리면 폴백으로 본다. */
+  giveUp: ReturnType<typeof setTimeout>;
 }
 
 export interface RtcMesh {
@@ -79,7 +94,21 @@ export function createRtcMesh(myId: string, callbacks: RtcCallbacks): RtcMesh {
 
   function createLink(peerId: string): PeerLink {
     const connection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-    const link: PeerLink = { connection, channel: null, pendingCandidates: [] };
+    logPeerFound(peerId);
+    const link: PeerLink = {
+      connection,
+      channel: null,
+      pendingCandidates: [],
+      startedAt: Date.now(),
+      opened: false,
+      /**
+       * 실패는 조용히 온다 — `failed` 상태가 안 오고 그냥 안 열리는 경우가 흔하다.
+       * 시간으로 재는 게 "폴백으로 돌고 있다" 를 알아채는 유일한 방법이다.
+       */
+      giveUp: setTimeout(() => {
+        if (!link.opened) logFallback(peerId, "시간 초과");
+      }, FALLBACK_NOTICE_MS),
+    };
     links.set(peerId, link);
 
     connection.onicecandidate = (event) => {
@@ -95,7 +124,11 @@ export function createRtcMesh(myId: string, callbacks: RtcCallbacks): RtcMesh {
       const state = connection.connectionState;
       // 실패해도 재시도하지 않는다. 폴링 폴백이 이미 좌표를 나르고 있고,
       // 계속 재협상하면 뚫리지 않는 네트워크에서 무한 루프가 된다.
-      if (state === "failed" || state === "closed") closeLink(peerId);
+      if (state === "failed" || state === "closed") {
+        if (!link.opened)
+          logFallback(peerId, state === "failed" ? "협상 실패" : "닫힘");
+        closeLink(peerId);
+      }
     };
 
     if (isInitiator(peerId)) {
@@ -135,6 +168,11 @@ export function createRtcMesh(myId: string, callbacks: RtcCallbacks): RtcMesh {
         callbacks.onEvent(peerId, new TextDecoder().decode(bytes.subarray(1)));
       }
     };
+    channel.onopen = () => {
+      link.opened = true;
+      clearTimeout(link.giveUp);
+      logDirect(peerId, Date.now() - link.startedAt);
+    };
     channel.onclose = () => {
       if (link.channel === channel) link.channel = null;
     };
@@ -161,6 +199,7 @@ export function createRtcMesh(myId: string, callbacks: RtcCallbacks): RtcMesh {
   function closeLink(peerId: string): void {
     const link = links.get(peerId);
     if (!link) return;
+    clearTimeout(link.giveUp);
     link.channel?.close();
     link.connection.close();
     links.delete(peerId);
@@ -173,6 +212,7 @@ export function createRtcMesh(myId: string, callbacks: RtcCallbacks): RtcMesh {
     },
 
     removePeer(peerId) {
+      if (links.has(peerId)) logPeerGone(peerId);
       closeLink(peerId);
     },
 

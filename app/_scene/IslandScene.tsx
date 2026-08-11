@@ -17,9 +17,10 @@ import { Hud } from "@/game/hud/Hud";
  *
  * feature 는 index.ts 를 통해서만 들어온다 — 내부 파일 경로를 쓰면 린트가 에러를 낸다.
  */
-export function IslandScene() {
+export function IslandScene({ onReady }: { onReady: () => void }) {
   return (
     <GameCanvas
+      onReady={onReady}
       overlay={
         <>
           <Hud />

@@ -237,6 +237,27 @@ describe("밀치기(넉백)", () => {
     expect(state.vx).toBeGreaterThan(DEFAULT_MOVE.maxSpeed * 1.5);
   });
 
+  it("멀리 날아간다", () => {
+    /**
+     * "왜 이렇게 어렵냐" 는 말을 듣고 세기를 올렸다. 숫자를 다시 만질 때
+     * **얼마나 가야 밀친 것 같은지**를 잊지 않으려고 거리로 못박아 둔다.
+     *
+     * 상수를 손으로 베끼지 않고 실제로 쓰는 값으로 시뮬레이션한다 —
+     * 마찰이나 중력을 바꿨을 때도 여기가 같이 반응해야 의미가 있다.
+     */
+    const state = createPlayerState(0, 0);
+    applyImpulse(state, SHOVE_IMPULSE, 0, SHOVE_LIFT);
+    // 멈출 때까지. 안 멈추면 무한루프가 나므로 넉넉한 상한을 둔다.
+    for (let i = 0; i < 600; i++) {
+      stepPlayer(state, IDLE_INTENT, FIXED_DT, DEFAULT_MOVE, FIELD);
+      if (state.grounded && Math.hypot(state.vx, state.vz) < 0.05) break;
+    }
+    // 섬 반지름이 26~40m 다. 열 걸음쯤은 밀려나야 "날아갔다" 로 보인다.
+    expect(state.x).toBeGreaterThan(12);
+    // 그렇다고 섬 밖까지 보내면 그건 밀치기가 아니라 추방이다.
+    expect(state.x).toBeLessThan(30);
+  });
+
   it("결국 마찰로 멈춘다", () => {
     const state = createPlayerState();
     applyImpulse(state, 9, 0, 3);
@@ -334,5 +355,59 @@ describe("interpolatePose", () => {
     const b = createPlayerState(0, 0, -Math.PI + 0.1);
     interpolatePose(a, b, 0.5, out);
     expect(Math.abs(out.yaw)).toBeCloseTo(Math.PI, 6);
+  });
+});
+
+describe("축의 길이가 세기다", () => {
+  /**
+   * ⚠ 예전엔 방향만 쓰고 길이를 버렸다. 키보드는 켜짐/꺼짐이라 티가 안 났는데,
+   *   조이스틱에서는 **손가락을 얼마나 밀든 늘 최고 속도**였다 —
+   *   폰에서 이동이 너무 빠르게 느껴진 이유의 절반이 이것이다.
+   */
+  const speedAfter = (axis: [number, number], sprint = false) => {
+    const state = createPlayerState(0, 0);
+    /**
+     * 가속이 끝날 만큼(60m/s² 로 30m/s 까지 0.5초) 돌리되 **제자리에 묶어둔다.**
+     * 안 그러면 2초 만에 시험용 격자를 벗어나 벽에 부딪히고, 속도가 0 이 되어
+     * 정작 재려던 값이 사라진다.
+     */
+    for (let i = 0; i < 60; i++) {
+      stepPlayer(
+        state,
+        { axis, jump: false, sprint },
+        FIXED_DT,
+        DEFAULT_MOVE,
+        FIELD,
+      );
+      state.x = 0;
+      state.z = 0;
+    }
+    return Math.hypot(state.vx, state.vz);
+  };
+
+  it("살짝 밀면 살살 걷는다", () => {
+    const half = speedAfter([0, -0.5]);
+    expect(half).toBeGreaterThan(DEFAULT_MOVE.maxSpeed * 0.4);
+    expect(half).toBeLessThan(DEFAULT_MOVE.maxSpeed * 0.6);
+  });
+
+  it("끝까지 밀면 최고 속도다", () => {
+    expect(speedAfter([0, -1])).toBeCloseTo(DEFAULT_MOVE.maxSpeed, 0);
+  });
+
+  it("키보드 대각선이 더 빠르지 않다", () => {
+    // (1,1) 은 길이가 1.41 이다. 안 자르면 대각선으로 갈 때만 40% 빨라진다.
+    expect(speedAfter([1, -1])).toBeCloseTo(DEFAULT_MOVE.maxSpeed, 0);
+  });
+
+  it("달리기는 세기 위에 곱해진다", () => {
+    // 반쯤 밀고 달리면 최고 속도의 절반 × 배수. 세기를 무시하면 안 된다.
+    const half = speedAfter([0, -0.5], true);
+    const full = speedAfter([0, -1], true);
+    expect(full).toBeCloseTo(
+      DEFAULT_MOVE.maxSpeed * DEFAULT_MOVE.sprintMultiplier,
+      0,
+    );
+    expect(half).toBeLessThan(full * 0.6);
   });
 });

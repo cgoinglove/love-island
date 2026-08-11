@@ -42,111 +42,136 @@ export async function beatPresence(input: BeatInput): Promise<BeatResult> {
   const { beat } = input;
   const now = new Date();
 
-  await db
-    .insert(presence)
-    .values({
-      playerId: beat.playerId,
-      room: beat.room,
-      nickname: beat.nickname,
-      posX: beat.x,
-      posZ: beat.z,
-      yaw: beat.yaw,
-      updatedAt: now,
-    })
-    // 같은 탭이 계속 보내므로 INSERT 가 아니라 덮어쓰기다.
-    .onConflictDoUpdate({
-      target: presence.playerId,
-      set: {
+  /**
+   * 쓰기와 읽기를 **한 묶음으로** 보낸다.
+   *
+   * 예전엔 upsert → (시그널 insert) → (사건 insert) → 읽기 셋 순서로 await 했다.
+   * 넷이 서로를 안 기다려도 되는데도 왕복이 최대 네 번 났다 — 로컬에서는 1ms 라
+   * 안 보이지만, 배포 환경(Vercel ↔ 원격 Postgres)에서는 왕복 하나가 수십 ms 다.
+   * 악수 중에는 그 차이가 그대로 **연결이 붙는 데 걸리는 시간**이 된다.
+   *
+   * 순서가 상관없는 이유: 읽는 것은 전부 **남이 나에게 남긴 것**이고
+   * (`ne(playerId, 나)`, `toId = 나`), 쓰는 것은 전부 **내가 남에게 남기는 것**이다.
+   * 내 쓰기가 내 읽기에 영향을 주지 않으므로 같이 보내도 결과가 같다.
+   */
+  const alive = new Date(now.getTime() - PRESENCE_TTL_SECONDS * 1000);
+  const eventFloor = new Date(now.getTime() - EVENT_TTL_SECONDS * 1000);
+
+  const writes: Promise<unknown>[] = [
+    db
+      .insert(presence)
+      .values({
+        playerId: beat.playerId,
         room: beat.room,
         nickname: beat.nickname,
         posX: beat.x,
         posZ: beat.z,
         yaw: beat.yaw,
         updatedAt: now,
-      },
-    });
+      })
+      // 같은 탭이 계속 보내므로 INSERT 가 아니라 덮어쓰기다.
+      .onConflictDoUpdate({
+        target: presence.playerId,
+        set: {
+          room: beat.room,
+          nickname: beat.nickname,
+          posX: beat.x,
+          posZ: beat.z,
+          yaw: beat.yaw,
+          updatedAt: now,
+        },
+      }),
+  ];
 
   if (input.signals.length > 0) {
-    await db.insert(signal).values(
-      input.signals.map((message) => ({
-        room: beat.room,
-        fromId: beat.playerId,
-        toId: message.to,
-        kind: message.kind,
-        payload: message.payload,
-        createdAt: now,
-      })),
+    writes.push(
+      db.insert(signal).values(
+        input.signals.map((message) => ({
+          room: beat.room,
+          fromId: beat.playerId,
+          toId: message.to,
+          kind: message.kind,
+          payload: message.payload,
+          createdAt: now,
+        })),
+      ),
     );
   }
 
   if (input.events.length > 0) {
-    await db.insert(roomEvent).values(
-      input.events.map((event) => ({
-        eventId: event.id,
-        room: beat.room,
-        fromId: beat.playerId,
-        nickname: beat.nickname,
-        kind: event.kind,
-        text: event.text,
-        posX: event.x,
-        posZ: event.z,
-        yaw: event.yaw,
-        createdAt: now,
-      })),
+    writes.push(
+      db.insert(roomEvent).values(
+        input.events.map((event) => ({
+          eventId: event.id,
+          room: beat.room,
+          fromId: beat.playerId,
+          nickname: beat.nickname,
+          kind: event.kind,
+          text: event.text,
+          posX: event.x,
+          posZ: event.z,
+          yaw: event.yaw,
+          createdAt: now,
+        })),
+      ),
     );
   }
 
-  const alive = new Date(now.getTime() - PRESENCE_TTL_SECONDS * 1000);
-  const eventFloor = new Date(now.getTime() - EVENT_TTL_SECONDS * 1000);
+  /**
+   * 읽기 셋은 서로를 안 기다리고, 쓰기와도 안 기다린다.
+   * 바깥 Promise.all 의 첫 칸만 꺼내 쓰고 쓰기는 완료만 기다린다.
+   */
+  const [[peers, inbox, events]] = await Promise.all([
+    Promise.all([
+      db
+        .select({
+          playerId: presence.playerId,
+          nickname: presence.nickname,
+          x: presence.posX,
+          z: presence.posZ,
+          yaw: presence.yaw,
+        })
+        .from(presence)
+        .where(
+          and(
+            eq(presence.room, beat.room),
+            ne(presence.playerId, beat.playerId),
+            gt(presence.updatedAt, alive),
+          ),
+        )
+        .limit(24),
 
-  const [peers, inbox, events] = await Promise.all([
-    db
-      .select({
-        playerId: presence.playerId,
-        nickname: presence.nickname,
-        x: presence.posX,
-        z: presence.posZ,
-        yaw: presence.yaw,
-      })
-      .from(presence)
-      .where(
-        and(
-          eq(presence.room, beat.room),
-          ne(presence.playerId, beat.playerId),
-          gt(presence.updatedAt, alive),
-        ),
-      )
-      .limit(24),
+      /**
+       * 읽으면서 지운다.
+       * DELETE ... RETURNING 이라 "읽고 나서 지우는" 사이에 다른 요청이 끼어들어
+       * 같은 메시지를 두 번 받는 일이 없다. 악수 메시지는 재사용도 안 되고
+       * 쌓아둘 이유도 없어서 이게 정확히 맞는 의미론이다.
+       */
+      db.delete(signal).where(eq(signal.toId, beat.playerId)).returning({
+        from: signal.fromId,
+        kind: signal.kind,
+        payload: signal.payload,
+      }),
 
-    /**
-     * 읽으면서 지운다.
-     * DELETE ... RETURNING 이라 "읽고 나서 지우는" 사이에 다른 요청이 끼어들어
-     * 같은 메시지를 두 번 받는 일이 없다. 악수 메시지는 재사용도 안 되고
-     * 쌓아둘 이유도 없어서 이게 정확히 맞는 의미론이다.
-     */
-    db.delete(signal).where(eq(signal.toId, beat.playerId)).returning({
-      from: signal.fromId,
-      kind: signal.kind,
-      payload: signal.payload,
-    }),
-
-    /**
-     * 사건은 커서 뒤의 것만. 자기가 보낸 건 제외한다 — 이미 로컬에서 처리했다.
-     * 처음 들어온 사람(cursor 0)에게는 최근 것 몇 개만 보여준다.
-     */
-    db
-      .select()
-      .from(roomEvent)
-      .where(
-        and(
-          eq(roomEvent.room, beat.room),
-          ne(roomEvent.fromId, beat.playerId),
-          gt(roomEvent.seq, input.cursor),
-          gt(roomEvent.createdAt, eventFloor),
-        ),
-      )
-      .orderBy(desc(roomEvent.seq))
-      .limit(40),
+      /**
+       * 사건은 커서 뒤의 것만. 자기가 보낸 건 제외한다 — 이미 로컬에서 처리했다.
+       * 처음 들어온 사람(cursor 0)에게는 최근 것 몇 개만 보여준다.
+       */
+      db
+        .select()
+        .from(roomEvent)
+        .where(
+          and(
+            eq(roomEvent.room, beat.room),
+            ne(roomEvent.fromId, beat.playerId),
+            gt(roomEvent.seq, input.cursor),
+            gt(roomEvent.createdAt, eventFloor),
+          ),
+        )
+        .orderBy(desc(roomEvent.seq))
+        .limit(40),
+    ]),
+    ...writes,
   ]);
 
   const parsedEvents: RoomEvent[] = [];
