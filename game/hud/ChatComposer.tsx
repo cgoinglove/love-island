@@ -3,6 +3,7 @@
 import { MessageCircle, SendHorizontal } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CHUNKY, SIGN, SIGN_ACCENT } from "@/components/island/ui";
+import { useAmSitting } from "@/game/net/activity";
 import { emitRoomEvent } from "@/game/net/presence";
 import { CHAT_MAX } from "@/shared/constants";
 import { REACTION_COOLDOWN_MS, type ReactionKind } from "@/shared/presence";
@@ -56,6 +57,14 @@ export function ChatComposer() {
   const inputRef = useRef<HTMLInputElement>(null);
   const touch = useTouchMode();
   const setChatOpen = useHudStore((state) => state.setChatOpen);
+  /**
+   * 앉아 있으면 아래 검은 띠(11vh) 위로 올라앉는다.
+   * 띠 뒤에 반쯤 잠긴 입력창은 안 보이는 것과 같다.
+   */
+  const sitting = useAmSitting();
+  const dockBottom = sitting
+    ? "bottom-[13vh]"
+    : "bottom-[max(1.5rem,env(safe-area-inset-bottom))]";
 
   // 조작 UI 가 서로 자리를 비켜주려면 누가 화면 어디를 쓰는지 알아야 한다.
   useEffect(() => {
@@ -160,7 +169,11 @@ export function ChatComposer() {
      */
     if (touch) {
       return (
-        <div className="fixed right-5 bottom-46 z-20 flex flex-col gap-2.5">
+        <div
+          className={`fixed right-5 ${
+            sitting ? "bottom-[16vh]" : "bottom-46"
+          } z-40 flex flex-col gap-2.5`}
+        >
           <button
             type="button"
             aria-label={t().hud.chatOpen}
@@ -193,7 +206,9 @@ export function ChatComposer() {
         세로로 쪼개지고 나침반과 겹쳤다. shrink 를 막고 줄바꿈을 끄면
         폭이 모자랄 때 버튼이 찌그러지는 대신 가운데 정렬을 유지한다.
       */
-      <div className="-translate-x-1/2 fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] left-1/2 z-20 flex max-w-[calc(100vw-1.5rem)] items-center gap-2">
+      <div
+        className={`-translate-x-1/2 fixed ${dockBottom} left-1/2 z-40 flex max-w-[calc(100vw-1.5rem)] items-center gap-2`}
+      >
         <button
           type="button"
           onClick={openInput}
@@ -229,7 +244,11 @@ export function ChatComposer() {
   }
 
   return (
-    <div className="-translate-x-1/2 fade-in slide-in-from-bottom-2 fixed bottom-6 left-1/2 z-20 w-[min(34rem,calc(100vw-2rem))] animate-in">
+    <div
+      className={`-translate-x-1/2 fade-in slide-in-from-bottom-2 fixed ${
+        sitting ? "bottom-[13vh]" : "bottom-6"
+      } left-1/2 z-40 w-[min(34rem,calc(100vw-2rem))] animate-in`}
+    >
       <div className="mb-2.5 flex justify-center gap-1.5">
         {EMOTES.map((emoji) => (
           <button

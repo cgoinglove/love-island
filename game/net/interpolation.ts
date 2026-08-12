@@ -19,12 +19,15 @@ export interface Snapshot {
   readonly x: number;
   readonly z: number;
   readonly yaw: number;
+  /** 지면 위 높이(m). 점프와 넉백이 남의 화면에도 보이려면 이게 있어야 한다. */
+  readonly y: number;
 }
 
 export interface Pose {
   x: number;
   z: number;
   yaw: number;
+  y: number;
 }
 
 /** 버퍼에 남길 최대 스냅샷 수. 320ms 지연이면 두세 개면 충분하고 나머지는 메모리 낭비다. */
@@ -64,6 +67,7 @@ export function sample(
     out.x = first.x;
     out.z = first.z;
     out.yaw = first.yaw;
+    out.y = first.y;
     return true;
   }
 
@@ -72,6 +76,7 @@ export function sample(
     out.x = last.x;
     out.z = last.z;
     out.yaw = last.yaw;
+    out.y = last.y;
     return true;
   }
 
@@ -87,6 +92,7 @@ export function sample(
     out.x = before.x + (after.x - before.x) * alpha;
     out.z = before.z + (after.z - before.z) * alpha;
     out.yaw = lerpAngle(before.yaw, after.yaw, alpha);
+    out.y = before.y + (after.y - before.y) * alpha;
     return true;
   }
 

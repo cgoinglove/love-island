@@ -70,7 +70,7 @@ export interface RtcMesh {
   removePeer(playerId: string): void;
   handleSignal(from: string, kind: SignalKind, payload: string): void;
   /** 연결된 모든 사람에게 내 좌표를 뿌린다. */
-  broadcastPose(x: number, z: number, yaw: number): void;
+  broadcastPose(x: number, z: number, yaw: number, y: number): void;
   /** 연결된 모든 사람에게 사건을 뿌린다. 서버로도 같이 가므로 실패해도 괜찮다. */
   broadcastEvent(json: string): void;
   isConnected(playerId: string): boolean;
@@ -83,7 +83,7 @@ export function createRtcMesh(myId: string, callbacks: RtcCallbacks): RtcMesh {
   const poseFrame = new Uint8Array(1 + POSE_BYTES);
   const poseView = new DataView(poseFrame.buffer, 1);
   const encoder = new TextEncoder();
-  const incoming: DecodedPose = { x: 0, z: 0, yaw: 0 };
+  const incoming: DecodedPose = { x: 0, z: 0, yaw: 0, y: 0 };
 
   /**
    * 누가 먼저 offer 를 보낼지 id 로 정한다.
@@ -255,13 +255,13 @@ export function createRtcMesh(myId: string, callbacks: RtcCallbacks): RtcMesh {
       })();
     },
 
-    broadcastPose(x, z, yaw) {
+    broadcastPose(x, z, yaw, y) {
       let encoded = false;
       for (const link of links.values()) {
         if (link.channel?.readyState !== "open") continue;
         if (!encoded) {
           poseFrame[0] = TAG_POSE;
-          encodePose(poseView, x, z, yaw);
+          encodePose(poseView, x, z, yaw, y);
           encoded = true;
         }
         // 버퍼가 밀렸으면 건너뛴다. 오래된 좌표를 쌓아 보내봐야 지연만 늘어난다.

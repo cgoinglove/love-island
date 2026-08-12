@@ -67,6 +67,7 @@ export async function beatPresence(input: BeatInput): Promise<BeatResult> {
         posX: beat.x,
         posZ: beat.z,
         yaw: beat.yaw,
+        posY: beat.y,
         updatedAt: now,
       })
       // 같은 탭이 계속 보내므로 INSERT 가 아니라 덮어쓰기다.
@@ -78,6 +79,7 @@ export async function beatPresence(input: BeatInput): Promise<BeatResult> {
           posX: beat.x,
           posZ: beat.z,
           yaw: beat.yaw,
+          posY: beat.y,
           updatedAt: now,
         },
       }),
@@ -130,6 +132,7 @@ export async function beatPresence(input: BeatInput): Promise<BeatResult> {
           x: presence.posX,
           z: presence.posZ,
           yaw: presence.yaw,
+          y: presence.posY,
         })
         .from(presence)
         .where(

@@ -166,6 +166,101 @@ export const CURVED_VERTEX = /* glsl */ `
  * 건드리게 되며, 무엇보다 **맵이 셰이더까지 닿지 않으면 새하얀 원반**이 된다.
  * 실제로 그렇게 나왔다. 원의 uv 하나로 풀 수 있는 걸 텍스처로 우회할 이유가 없다.
  */
+/**
+ * 뱃등이 쏘는 빛줄기.
+ *
+ * ── 왜 셰이더가 필요한가 ──
+ * 처음엔 원뿔 껍데기에 **정점 알파**로 그라데이션을 구웠다. 길이 방향으로는
+ * 옅어졌지만 옆으로는 그럴 수가 없었다 — 껍데기의 정점은 전부 원뿔의 **테두리**에
+ * 있어서, 가운데를 밝게 할 자리가 애초에 없다. 결과는 흰 삼각형 한 장이었다.
+ * 종이를 오려 붙인 것처럼 보였고, 실제로 "이게 뭐냐" 는 말을 들었다.
+ *
+ * ── 어떻게 부피처럼 보이나 ──
+ * 껍데기의 **법선이 카메라를 정면으로 보는 지점이 빔의 한가운데**이고,
+ * 실루엣 가장자리에서는 법선이 시선과 직각이 된다. 그래서 `dot(법선, 시선)` 하나로
+ * 가운데는 밝고 가장자리는 사라지는 분포가 나온다 — 안쪽 벽과 바깥쪽 벽이
+ * 더해지면서(양면 · 더하기 합성) 진짜 빛기둥처럼 속이 찬다.
+ *
+ * 이건 부피 렌더링이 아니라 **껍데기 하나로 부피를 흉내내는** 오래된 방법이고,
+ * 이 정도 거리(40m)에서는 구분이 안 된다.
+ */
+export const BEAM_VERTEX = /* glsl */ `
+  ${CURVATURE_VERTEX}
+
+  uniform float uBeamLength;
+
+  varying vec3 vBeamNormal;
+  varying vec3 vBeamEye;
+  varying float vBeamAlong;
+
+  void main() {
+    // 원뿔은 꼭짓점이 원점이고 -Z 로 뻗는다. 0 = 등, 1 = 끝.
+    vBeamAlong = clamp(-position.z / uBeamLength, 0.0, 1.0);
+
+    vec4 world = curvedWorld(position);
+    // 배가 돌고 기울므로 월드 공간으로 옮겨야 시선과 같은 좌표계가 된다.
+    vBeamNormal = normalize(mat3(modelMatrix) * normal);
+    vBeamEye = cameraPosition - world.xyz;
+
+    csm_PositionRaw = projectionMatrix * viewMatrix * world;
+  }
+`;
+
+export const BEAM_FRAGMENT = /* glsl */ `
+  uniform vec3 uBeamColor;
+  uniform float uBeamStrength;
+
+  varying vec3 vBeamNormal;
+  varying vec3 vBeamEye;
+  varying float vBeamAlong;
+
+  void main() {
+    // 카메라를 마주 볼수록 빔의 한가운데다. 실루엣에서는 0 이 되어 경계가 녹는다.
+    float facing = abs(dot(normalize(vBeamNormal), normalize(vBeamEye)));
+    float core = pow(facing, 2.2);
+
+    /**
+     * 길이 방향 감쇠. 뿌리에서 진하고 끝에서 사라진다.
+     * 꼭짓점 바로 앞은 오히려 살짝 눌러야 한다 — 등 자체의 발광과 겹쳐서
+     * 그 한 점만 하얗게 타버린다.
+     */
+    float fade = pow(1.0 - vBeamAlong, 0.8) * smoothstep(0.0, 0.09, vBeamAlong);
+
+    csm_DiffuseColor = vec4(uBeamColor, core * fade * uBeamStrength);
+  }
+`;
+
+/**
+ * 빛이 물에 닿아 생기는 웅덩이.
+ *
+ * 원판의 uv 로 가운데에서 바깥으로 부드럽게 죽인다 — 접촉 그림자와 같은 수법이고
+ * 같은 이유다. 경계가 뚜렷하면 빛이 아니라 물 위에 붙인 스티커로 보인다.
+ * 원판을 진행 방향으로 늘려도 uv 는 그대로라, 늘어난 만큼 타원으로 번진다.
+ */
+export const LIGHT_POOL_VERTEX = /* glsl */ `
+  ${CURVATURE_VERTEX}
+
+  varying vec2 vPoolUv;
+
+  void main() {
+    vPoolUv = uv;
+    csm_PositionRaw = projectionMatrix * viewMatrix * curvedWorld(position);
+  }
+`;
+
+export const LIGHT_POOL_FRAGMENT = /* glsl */ `
+  uniform vec3 uPoolColor;
+  uniform float uPoolStrength;
+
+  varying vec2 vPoolUv;
+
+  void main() {
+    float d = length(vPoolUv - 0.5) * 2.0;
+    float a = pow(max(0.0, 1.0 - d), 2.4) * uPoolStrength;
+    csm_DiffuseColor = vec4(uPoolColor, a);
+  }
+`;
+
 export const CONTACT_SHADOW_VERTEX = /* glsl */ `
   ${CURVATURE_VERTEX}
 

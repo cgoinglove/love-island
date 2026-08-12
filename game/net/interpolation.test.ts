@@ -7,13 +7,14 @@ import {
   sample,
 } from "./interpolation";
 
-const snap = (t: number, x: number, z = 0, yaw = 0): Snapshot => ({
+const snap = (t: number, x: number, z = 0, yaw = 0, y = 0): Snapshot => ({
   t,
   x,
   z,
   yaw,
+  y,
 });
-const pose = (): Pose => ({ x: 0, z: 0, yaw: 0 });
+const pose = (): Pose => ({ x: 0, z: 0, yaw: 0, y: 0 });
 
 describe("pushSnapshot", () => {
   it("시간순으로 쌓인다", () => {
@@ -131,5 +132,35 @@ describe("lastSnapshotTime", () => {
 
   it("마지막 수신 시각을 준다", () => {
     expect(lastSnapshotTime([snap(100, 0), snap(400, 0)])).toBe(400);
+  });
+});
+
+describe("높이(점프·넉백)", () => {
+  /**
+   * ⚠ 높이가 패킷에 없어서 **남의 점프와 넉백이 안 보였다.** 받는 쪽은 좌표의
+   *   지면 높이에 캐릭터를 붙여놓기 때문에 상대는 땅에 붙어 미끄러졌다.
+   *   본인 화면에서는 멀쩡히 뜨니 "싱크가 안 맞는다" 로 보인다.
+   */
+  it("두 스냅샷 사이에서 높이도 같이 채워진다", () => {
+    const buffer: Snapshot[] = [];
+    pushSnapshot(buffer, snap(0, 0, 0, 0, 0));
+    pushSnapshot(buffer, snap(100, 0, 0, 0, 2));
+
+    const out = pose();
+    expect(sample(buffer, 50, out)).toBe(true);
+    // 위치만 채우고 높이를 빼먹으면 여기가 0 으로 남는다.
+    expect(out.y).toBeCloseTo(1, 5);
+  });
+
+  it("버퍼 밖에서는 끝값으로 고정된다", () => {
+    const buffer: Snapshot[] = [];
+    pushSnapshot(buffer, snap(0, 0, 0, 0, 1.5));
+    pushSnapshot(buffer, snap(100, 0, 0, 0, 1.8));
+
+    const out = pose();
+    sample(buffer, -50, out);
+    expect(out.y).toBeCloseTo(1.5, 5);
+    sample(buffer, 500, out);
+    expect(out.y).toBeCloseTo(1.8, 5);
   });
 });

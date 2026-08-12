@@ -34,6 +34,16 @@ export interface Interactable {
    * 이름표가 화면에 남아 있으면 정작 봐야 할 것(찌)을 가린다.
    */
   readonly enabled?: boolean | undefined;
+  /**
+   * 이름표가 보이기 시작하는 거리(m). 없으면 섬 어디서나 보인다.
+   *
+   * 기본이 "어디서나" 인 건 의도다 — 메뉴가 없는 세계라 이름표가 곧 목차이고,
+   * 반대편에서도 보여야 갈 곳이 생긴다. 다만 **갈 곳이 아닌 것**도 있다:
+   * 의자는 걸어가서 여는 컨텐츠가 아니라 거기 있을 때 하는 행동이라,
+   * 섬 반대편까지 "앉기" 를 띄우면 목차가 아니라 소음이 된다.
+   * 그 소음이 정작 봐야 할 것(남의 말풍선)을 가린다.
+   */
+  readonly labelRange?: number | undefined;
   readonly onInteract: () => void;
 }
 
@@ -114,6 +124,9 @@ export function useInteractable(definition: Interactable): void {
        */
       get labelHeight() {
         return latest.current.labelHeight;
+      },
+      get labelRange() {
+        return latest.current.labelRange;
       },
       onInteract: () => latest.current.onInteract(),
     };

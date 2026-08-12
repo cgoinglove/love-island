@@ -129,6 +129,23 @@ export function parseBotDecision(text: string) {
   }
 }
 
+/**
+ * "지금 뭘 하고 있다" 는 알림.
+ *
+ * 여기서 처리하지 않고 넘기기만 하는 이유는 game/net/activity 가 이 파일을
+ * import 하기 때문이다. 반대로 여기서 activity 를 부르면 presence →
+ * roomEvents → activity → presence 로 고리가 닫힌다.
+ */
+type ActivityHandler = (event: RoomEvent) => void;
+const activityHandlers = new Set<ActivityHandler>();
+
+export function registerActivityHandler(handler: ActivityHandler): () => void {
+  activityHandlers.add(handler);
+  return () => {
+    activityHandlers.delete(handler);
+  };
+}
+
 export function registerShoveHandler(handler: ShoveHandler): () => void {
   shoveHandlers.add(handler);
   return () => {
@@ -163,6 +180,11 @@ export function handleRoomEvent(event: RoomEvent, myId: string): void {
 
   if (event.kind === "bot" || event.kind === "botAsk") {
     for (const handler of botHandlers) handler(event);
+    return;
+  }
+
+  if (event.kind === "act") {
+    for (const handler of activityHandlers) handler(event);
     return;
   }
 

@@ -14,6 +14,7 @@ import { useTuning } from "@/game/dev/useTuning";
 import { InteractableLabels } from "@/game/hud/InteractableLabels";
 import { InteractionWatcher } from "@/game/hud/InteractionWatcher";
 import { Minimap, MinimapFrame } from "@/game/hud/Minimap";
+import { useActivityFeed } from "@/game/net/activity";
 import { usePresence } from "@/game/net/usePresence";
 import { LocalPlayer } from "@/game/player/LocalPlayer";
 import { RemotePlayers } from "@/game/player/RemotePlayers";
@@ -26,6 +27,7 @@ import { Palms } from "@/game/world/Palms";
 import { Reactions } from "@/game/world/Reactions";
 import { SeaBanner } from "@/game/world/SeaBanner";
 import { Seafloor } from "@/game/world/Seafloor";
+import { SeaLife } from "@/game/world/SeaLife";
 import { Sky } from "@/game/world/Sky";
 import { Terrain } from "@/game/world/Terrain";
 
@@ -75,6 +77,8 @@ export function GameCanvas({ children, overlay, onReady }: GameCanvasProps) {
 
   // 내 위치를 올리고 남들 위치를 받아오는 루프. Canvas 밖에서 돈다.
   usePresence(controllerRef);
+  // 누가 낚시 중이고 누가 앉아 있는지. 사건으로 오가고 여기서 한 번만 받는다.
+  useActivityFeed();
 
   // 곡률은 씬 전체가 공유하는 값이라 유니폼 객체 하나에 밀어 넣는다.
   // 오브젝트마다 prop 으로 내려보내면 하나라도 빠뜨리는 순간 그것만 공중에 뜬다.
@@ -110,6 +114,8 @@ export function GameCanvas({ children, overlay, onReady }: GameCanvasProps) {
             <SeaBanner curvature={tuning.curvature} />
             <Terrain curvature={tuning.curvature} onTapGround={walkTo} />
             <Seafloor />
+            {/* 배 · 지느러미 · 튀어오르는 물고기. 전부 공유 시계에서 나온다. */}
+            <SeaLife />
             <Palms />
 
             <LocalPlayer

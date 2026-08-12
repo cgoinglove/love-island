@@ -14,6 +14,7 @@ import {
 import { CHARACTER_HEIGHT, CharacterModel } from "./CharacterModel";
 import { ContactShadow } from "./ContactShadow";
 import { SpeechBubble } from "./SpeechBubble";
+import { applySitPose, isSitting } from "./sitPose";
 
 /**
  * 지금 섬에 있는 다른 사람들.
@@ -52,7 +53,8 @@ function RemotePlayer({
   nickname: string | null;
 }) {
   const groupRef = useRef<Group>(null);
-  const poseRef = useRef<Pose>({ x: 0, z: 0, yaw: 0 });
+  const bodyRef = useRef<Group>(null);
+  const poseRef = useRef<Pose>({ x: 0, z: 0, yaw: 0, y: 0 });
   const bubble = useRoomEventStore((state) => state.bubbles[playerId]);
 
   useFrame(() => {
@@ -79,15 +81,33 @@ function RemotePlayer({
     group.visible = true;
     // 리모트는 점프 높이를 따로 받지 않는다 — 좌표만 6바이트로 보내기 때문이다.
     // 지형 높이에 붙여두면 점프가 살짝 뭉개지지만 대역폭을 지킨다.
-    group.position.set(pose.x, elevationAt(pose.x, pose.z), pose.z);
+    // 지형 높이 **위에** 실려 온 높이를 더한다. 이게 없으면 남의 점프와 넉백이
+    // 통째로 사라져서, 본인 화면에서만 뜨고 남의 화면에서는 미끄러진다.
+    group.position.set(pose.x, elevationAt(pose.x, pose.z) + pose.y, pose.z);
     group.rotation.y = pose.yaw;
+
+    /**
+     * 앉아 있으면 의자에 파묻힌 자세로 그린다.
+     * 좌표만 오고 자세는 안 오지만, "지금 앉아 있다" 는 사실은 활동 상태로
+     * 따로 오기 때문에(game/net/activity) 이 한 줄이면 남의 앉음도 보인다.
+     */
+    const body = bodyRef.current;
+    if (body) {
+      if (isSitting(playerId)) applySitPose(body);
+      else {
+        body.position.y = 0;
+        body.rotation.x = 0;
+      }
+    }
   });
 
   return (
     <group ref={groupRef} visible={false}>
       <ContactShadow />
       {/* 외형은 playerId 로 정해진다 — 서버가 아무것도 안 보내도 모두가 같은 모습을 본다. */}
-      <CharacterModel seed={playerId} />
+      <group ref={bodyRef}>
+        <CharacterModel seed={playerId} />
+      </group>
 
       <SpeechBubble
         y={CHARACTER_HEIGHT + 0.28}

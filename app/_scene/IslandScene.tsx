@@ -4,6 +4,7 @@ import { AlbumPanel, Easel } from "@/features/album";
 import { CareerPanel, Desk } from "@/features/career";
 import { FishingHud, FishingSpot, Tackle } from "@/features/fishing";
 import { Board, GuestbookNotes, GuestbookPanel } from "@/features/guestbook";
+import { Chairs, SeatHud } from "@/features/sunset";
 import { GameCanvas } from "@/game/GameCanvas";
 import { Hud } from "@/game/hud/Hud";
 
@@ -29,6 +30,7 @@ export function IslandScene({ onReady }: { onReady: () => void }) {
 
           <AlbumPanel />
           <FishingHud />
+          <SeatHud />
         </>
       }
     >
@@ -37,6 +39,7 @@ export function IslandScene({ onReady }: { onReady: () => void }) {
       <Desk />
       <FishingSpot />
       <Tackle />
+      <Chairs />
       <Easel />
     </GameCanvas>
   );

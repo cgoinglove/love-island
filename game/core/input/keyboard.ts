@@ -38,17 +38,25 @@ const SPRINT_KEYS = new Set(["ShiftLeft", "ShiftRight"]);
  * key 는 키보드 레이아웃(한글 입력 상태, Dvorak, AZERTY)에 따라 바뀌지만
  * code 는 물리적 키 위치라 항상 같다. 한글 모드에서 WASD 가 죽는 흔한 버그를 여기서 막는다.
  */
+/**
+ * 지금 글을 치고 있는가.
+ *
+ * 채팅창에 "wasd" 를 치는 동안 캐릭터가 걸어가면 안 된다. 그런데 이 판단이
+ * 필요한 곳은 이동 입력만이 아니다 — 키를 가로채는 화면이 늘어날 때마다
+ * (낚시의 Space, 앉기의 Esc·WASD) 같은 실수를 되풀이하게 된다.
+ * 실제로 앉아서 "가자" 를 치면 그 자리에서 일어나 버렸다.
+ */
+export function isTypingTarget(event: KeyboardEvent): boolean {
+  const node = event.target as HTMLElement | null;
+  if (!node) return false;
+  const tag = node.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || node.isContentEditable;
+}
+
 export function createKeyboardInput(target: Window = window): AxisSource {
   const pressed = new Set<string>();
   const out: [number, number] = [0, 0];
-
-  const isTyping = (event: KeyboardEvent): boolean => {
-    const node = event.target as HTMLElement | null;
-    if (!node) return false;
-    // 채팅창에 "wasd" 를 치는 동안 캐릭터가 걸어가면 안 된다.
-    const tag = node.tagName;
-    return tag === "INPUT" || tag === "TEXTAREA" || node.isContentEditable;
-  };
+  const isTyping = isTypingTarget;
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.metaKey || event.ctrlKey || event.altKey) return;

@@ -44,6 +44,7 @@ import {
   type RenderPose,
   stepPlayer,
 } from "./simulation";
+import { applySitPose, isSitting } from "./sitPose";
 
 const NO_INPUT: Vec2XZ = [0, 0];
 
@@ -118,7 +119,7 @@ export function LocalPlayer({
     previous: PlayerState;
     current: PlayerState;
     pose: RenderPose;
-    controllerPose: { x: number; z: number; yaw: number };
+    controllerPose: { x: number; z: number; yaw: number; y: number };
     intent: MoveIntent;
     /** 모바일 버튼·조이스틱이 밀어 넣는 값. 키보드와 합쳐진다. */
     virtual: { x: number; z: number; jump: boolean; sprint: boolean };
@@ -131,7 +132,7 @@ export function LocalPlayer({
       previous: createPlayerState(startX, startZ),
       current: createPlayerState(startX, startZ),
       pose: { x: startX, z: startZ, y: 0, yaw: 0 },
-      controllerPose: { x: startX, z: startZ, yaw: 0 },
+      controllerPose: { x: startX, z: startZ, yaw: 0, y: 0 },
       intent: { axis: [0, 0], jump: false, sprint: false },
       virtual: { x: 0, z: 0, jump: false, sprint: false },
       lastShoveAt: -9999,
@@ -190,6 +191,8 @@ export function LocalPlayer({
         sim.controllerPose.x = sim.current.x;
         sim.controllerPose.z = sim.current.z;
         sim.controllerPose.yaw = sim.current.yaw;
+        // 높이도 실어 보낸다. 이게 빠지면 남의 화면에서 내 점프와 넉백이 사라진다.
+        sim.controllerPose.y = sim.current.y;
         return sim.controllerPose;
       },
       setVirtualAxis(x, z) {
@@ -203,6 +206,17 @@ export function LocalPlayer({
       },
       setVirtualSprint(down) {
         sim.virtual.sprint = down;
+      },
+      place(x, z, yaw) {
+        // 두 스텝을 모두 옮긴다. 하나만 고치면 보간이 이전 자리에서 끌고 온다.
+        for (const step of [sim.current, sim.previous]) {
+          step.x = x;
+          step.z = z;
+          step.yaw = yaw;
+          step.vx = 0;
+          step.vz = 0;
+        }
+        clearPath(follower);
       },
       shove() {
         const now = performance.now();
@@ -284,11 +298,15 @@ export function LocalPlayer({
         const stride = Math.min(speed / 3.4, 1.6);
         const walkPhase = now * 0.014;
 
-        body.rotation.x = shove - 0.06 * stride;
-        body.rotation.z = Math.sin(walkPhase) * 0.055 * stride;
-        body.position.y = sim.current.grounded
-          ? Math.abs(Math.sin(walkPhase)) * 0.07 * stride
-          : 0.04; // 공중에선 몸을 살짝 움츠린다
+        if (isSitting(myId)) {
+          applySitPose(body);
+        } else {
+          body.rotation.x = shove - 0.06 * stride;
+          body.rotation.z = Math.sin(walkPhase) * 0.055 * stride;
+          body.position.y = sim.current.grounded
+            ? Math.abs(Math.sin(walkPhase)) * 0.07 * stride
+            : 0.04; // 공중에선 몸을 살짝 움츠린다
+        }
       }
 
       /**

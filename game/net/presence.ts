@@ -91,6 +91,8 @@ export interface SelfSnapshot {
   x: number;
   z: number;
   yaw: number;
+  /** 지면 위 높이(m). 점프와 넉백이 남의 화면에도 보이려면 이게 있어야 한다. */
+  y: number;
 }
 
 /** 이 탭의 신원. sessionStorage 라 탭을 새로 열면 다른 사람으로 잡힌다. */
@@ -137,7 +139,7 @@ function ensurePeer(playerId: string, nickname: string | null): Peer {
       playerId,
       nickname,
       buffer: [],
-      pose: { x: 0, z: 0, yaw: 0 },
+      pose: { x: 0, z: 0, yaw: 0, y: 0 },
       direct: false,
     };
     peers.set(playerId, peer);
@@ -175,6 +177,7 @@ export function startPresence(getSelf: () => SelfSnapshot | null): () => void {
         x: pose.x,
         z: pose.z,
         yaw: pose.yaw,
+        y: pose.y,
       });
     },
     onEvent(_peerId, json) {
@@ -223,6 +226,7 @@ export function startPresence(getSelf: () => SelfSnapshot | null): () => void {
       x: number;
       z: number;
       yaw: number;
+      y: number;
     }>,
   ): void {
     const now = performance.now();
@@ -244,6 +248,7 @@ export function startPresence(getSelf: () => SelfSnapshot | null): () => void {
         x: entry.x,
         z: entry.z,
         yaw: entry.yaw,
+        y: entry.y,
       });
     }
 
@@ -314,6 +319,7 @@ export function startPresence(getSelf: () => SelfSnapshot | null): () => void {
           x: self.x,
           z: self.z,
           yaw: self.yaw,
+          y: self.y,
           signals,
           events,
           cursor,
@@ -373,7 +379,7 @@ export function startPresence(getSelf: () => SelfSnapshot | null): () => void {
     if (document.visibilityState !== "visible") return;
     const self = getSelf();
     if (self === null) return;
-    mesh.broadcastPose(self.x, self.z, self.yaw);
+    mesh.broadcastPose(self.x, self.z, self.yaw, self.y);
   }, RTC_POSE_INTERVAL_MS);
 
   const onVisible = () => {

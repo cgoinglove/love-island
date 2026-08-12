@@ -116,17 +116,15 @@ const ko = {
     cast: "던지기 (Space)",
     casting: "던지는 중…",
     waiting: "기다리는 중… 찌를 보세요",
-    reeling: "끌어올리는 중…",
+    fighting: "버틴다! 화면을 보세요",
     now: "지금! (Space)",
     missed: "놓쳤어요 — 다시 던지기",
     again: "한 번 더 (Space)",
     quit: "그만",
     blank: "꽝",
-    rateLimited: "오늘은 이 정도만. 한 시간 뒤에 다시 오세요.",
-    lineSnapped: "줄이 끊어졌습니다. 다시 던져보세요.",
     /** 확률은 전리품표에서 계산해 넘긴다 — 숫자를 손으로 적으면 표와 어긋난다. */
     odds: (percent: string) => `${percent}% 확률로 아메리카노 쿠폰이 나옵니다.`,
-    couponTitle: "교환 코드",
+    couponTitle: "당첨",
     couponHowTo: (contact: string) =>
       `이 화면을 캡처해서 ${contact} 으로 보내주세요. 진짜로 삽니다.`,
     catchables: {
@@ -200,6 +198,12 @@ const ko = {
         ],
       },
     },
+  },
+
+  sunset: {
+    label: "앉기",
+    caption: "가만히 보세요. 밤이 오면 폭죽이 터집니다.",
+    stand: "일어나기 (Esc)",
   },
 
   banner: {
@@ -302,16 +306,14 @@ const en: Dict = {
     cast: "Cast (Space)",
     casting: "Casting…",
     waiting: "Waiting… watch the bobber",
-    reeling: "Reeling in…",
+    fighting: "It's fighting! Watch the water",
     now: "NOW! (Space)",
     missed: "Missed it — cast again",
     again: "One more (Space)",
     quit: "Stop",
     blank: "NOTHING",
-    rateLimited: "That's enough for now. Come back in an hour.",
-    lineSnapped: "The line snapped. Try casting again.",
     odds: (percent: string) => `${percent}% chance of a real americano coupon.`,
-    couponTitle: "Redeem code",
+    couponTitle: "YOU WON",
     couponHowTo: (contact: string) =>
       `Screenshot this and send it to ${contact}. It's a real coffee.`,
     catchables: {
@@ -389,6 +391,12 @@ const en: Dict = {
         ],
       },
     },
+  },
+
+  sunset: {
+    label: "Sit down",
+    caption: "Just watch. Fireworks come out at night.",
+    stand: "Stand up (Esc)",
   },
 
   banner: {

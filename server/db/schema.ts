@@ -5,7 +5,6 @@ import {
   real,
   text,
   timestamp,
-  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -67,6 +66,8 @@ export const presence = pgTable(
     posX: real("pos_x").notNull(),
     posZ: real("pos_z").notNull(),
     yaw: real("yaw").notNull(),
+    /** 지면 위 높이(m). 점프와 넉백이 남의 화면에도 보이려면 이게 있어야 한다. */
+    posY: real("pos_y").notNull().default(0),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -140,41 +141,3 @@ export const roomEvent = pgTable(
 );
 
 export type RoomEventRow = typeof roomEvent.$inferSelect;
-
-/**
- * 낚시로 잡은 것.
- *
- * ── 왜 저장하나 ──
- * 커피 쿠폰은 **진짜로 사주는** 보상이다. 클라이언트가 만든 화면을 캡처해 보내는
- * 방식이면 개발자 도구를 아는 사람은 누구나 위조한다. 굴림을 서버가 하고 결과를
- * 여기 남겨야, 받은 코드가 진짜인지 확인할 수 있다.
- *
- * ── 확인하는 법 ──
- * SELECT * FROM catch WHERE code = '보내온 코드';
- * claimed_at 이 비어 있으면 아직 안 쓴 것이다. 쓴 뒤엔 채워둔다.
- */
-export const catchLog = pgTable(
-  "catch",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    room: varchar("room", { length: 32 }).notNull(),
-    playerId: varchar("player_id", { length: 64 }).notNull(),
-    itemId: varchar("item_id", { length: 32 }).notNull(),
-    /** 교환 코드. 진짜 보상일 때만 발급한다. */
-    code: varchar("code", { length: 12 }),
-    /** 사용 처리 시각. 주인장이 커피를 사주고 나면 채운다. */
-    claimedAt: timestamp("claimed_at", { withTimezone: true }),
-    ipHash: varchar("ip_hash", { length: 64 }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    // 코드로 조회 = 쿠폰 확인. 가장 자주 하는 질의다.
-    uniqueIndex("catch_code_idx").on(table.code),
-    // 시간당 횟수 제한을 세는 데 쓴다.
-    index("catch_ip_created_idx").on(table.ipHash, table.createdAt),
-  ],
-);
-
-export type CatchRow = typeof catchLog.$inferSelect;

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { SIGN } from "@/components/island/ui";
 import { usePlayerController } from "@/game/core/playerControl";
+import { useAmSitting } from "@/game/net/activity";
 import { usePresenceStore } from "@/game/net/presence";
 import { OWNER_NAME } from "@/shared/constants";
 import { LOCALES } from "@/shared/i18n";
@@ -25,6 +26,7 @@ export function Hud({ minimap }: { minimap?: React.ReactNode }) {
   const online = usePresenceStore((state) => state.online);
   const direct = usePresenceStore((state) => state.direct);
   const controllerRef = usePlayerController();
+  const sitting = useAmSitting();
   const [booted, setBooted] = useState(false);
 
   // 인트로 카메라가 도는 3초 동안은 HUD 를 감춘다. 첫 화면은 섬만 보여준다.
@@ -115,9 +117,14 @@ export function Hud({ minimap }: { minimap?: React.ReactNode }) {
 
       {minimap}
       <InteractionPrompt />
+      {/*
+        앉아도 채팅은 남는다. **둘이 나란히 앉아 얘기하면서 보는 것**이
+        이 자리의 용도라, 여기서 입을 막으면 의자가 혼자 앉는 자리가 된다.
+        대신 걸어다니는 조작(조이스틱 · 단축키 안내)은 접는다.
+      */}
       {!panelOpen && <ChatComposer />}
-      {!panelOpen && <TouchControls />}
-      {!panelOpen && <Shortcuts />}
+      {!panelOpen && !sitting && <TouchControls />}
+      {!panelOpen && !sitting && <Shortcuts />}
     </>
   );
 }

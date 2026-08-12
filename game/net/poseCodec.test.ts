@@ -6,17 +6,28 @@ import {
   POSE_BYTES,
 } from "./poseCodec";
 
-function roundTrip(x: number, z: number, yaw: number): DecodedPose {
+function roundTrip(x: number, z: number, yaw: number, y = 0): DecodedPose {
   const view = new DataView(new ArrayBuffer(POSE_BYTES));
-  encodePose(view, x, z, yaw);
-  const out: DecodedPose = { x: 0, z: 0, yaw: 0 };
+  encodePose(view, x, z, yaw, y);
+  const out: DecodedPose = { x: 0, z: 0, yaw: 0, y: 0 };
   decodePose(view, out);
   return out;
 }
 
 describe("poseCodec", () => {
-  it("한 세트가 6바이트다 (JSON 이면 40바이트쯤 된다)", () => {
-    expect(POSE_BYTES).toBe(6);
+  it("한 세트가 8바이트다 (JSON 이면 50바이트쯤 된다)", () => {
+    expect(POSE_BYTES).toBe(8);
+  });
+
+  it("높이도 함께 실려 간다", () => {
+    /**
+     * ⚠ 예전엔 x·z·yaw 만 실려 갔다. 받는 쪽은 그 좌표의 지면 높이에 캐릭터를
+     *   붙여놓기 때문에, **남의 점프와 넉백이 통째로 사라졌다** —
+     *   본인 화면에서만 뜨고 남에게는 땅에 붙어 미끄러지는 것으로 보였다.
+     */
+    for (const y of [0, 0.61, 1.8, 4]) {
+      expect(roundTrip(3, -4, 1, y).y).toBeCloseTo(y, 3);
+    }
   });
 
   it("왕복해도 밀리미터 안쪽으로 돌아온다", () => {
@@ -65,8 +76,8 @@ describe("poseCodec", () => {
   it("같은 입력은 같은 바이트를 만든다 (결정적)", () => {
     const a = new DataView(new ArrayBuffer(POSE_BYTES));
     const b = new DataView(new ArrayBuffer(POSE_BYTES));
-    encodePose(a, 3.14, -2.72, 1.41);
-    encodePose(b, 3.14, -2.72, 1.41);
+    encodePose(a, 3.14, -2.72, 1.41, 0);
+    encodePose(b, 3.14, -2.72, 1.41, 0);
     expect(new Uint8Array(a.buffer)).toEqual(new Uint8Array(b.buffer));
   });
 });

@@ -9,6 +9,7 @@ import { CurvedMaterial } from "@/game/world/curvature";
 import { mergeColored } from "@/game/world/meshKit";
 import { t } from "@/shared/strings";
 import {
+  CAST_AIM,
   FISHING_APPROACH,
   FISHING_PANEL_ID,
   FISHING_POSITION,
@@ -73,7 +74,24 @@ export function FishingSpot() {
      * 패널을 여는 게 아니라 **낚시 모드로 들어간다.**
      * 모달이 뜨면 그 순간 3D 가 배경이 되고, 배경이 되면 게임이 아니라 설명서가 된다.
      */
-    onInteract: () => useFishingStore.getState().set("ready"),
+    onInteract: () => {
+      /**
+       * 물 쪽을 보게 돌려세운다.
+       *
+       * 걸어온 방향 그대로 서 있으면 몸은 섬 안쪽을 보는데 낚싯대만 바다로
+       * 뻗는다 — 대를 손에 들려준 순간부터 그 어긋남이 눈에 띈다.
+       * 자리는 그대로 두고 **각도만** 바꾼다.
+       */
+      const pose = controllerRef.current?.pose();
+      if (pose) {
+        controllerRef.current?.place(
+          pose.x,
+          pose.z,
+          Math.atan2(-CAST_AIM[0], -CAST_AIM[1]),
+        );
+      }
+      useFishingStore.getState().set("ready");
+    },
   });
 
   return (

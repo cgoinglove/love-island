@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 /**
  * 낚시 전리품표.
  *
@@ -141,21 +139,17 @@ export function rollCatch(random: () => number): Catchable {
   return CATCHABLES[CATCHABLES.length - 1] as Catchable;
 }
 
-// ── 통신 계약 ────────────────────────────────────────────
-
-export const catchRequest = z.object({
-  playerId: z.string().min(8).max(64),
-  room: z.string().min(1).max(32),
-});
-export type CatchRequest = z.infer<typeof catchRequest>;
-
-export const catchResult = z.object({
-  itemId: z.string(),
-  /** 교환 코드. redeemable 이 아닌 경우엔 없다. */
-  code: z.string().nullable(),
-  caughtAt: z.string(),
-});
-export type CatchResult = z.infer<typeof catchResult>;
-
-/** 한 시간에 이 횟수까지만 던질 수 있다. 서버가 굴리므로 여기가 유일한 방벽이다. */
-export const CATCH_HOURLY_LIMIT = 30;
+/**
+ * ⚠ 서버가 없다. **주사위는 브라우저가 굴린다.**
+ *
+ * 한때 `/api/catch` 가 굴리고 `catch` 테이블에 코드를 남겼다. 진짜 커피가 걸려 있으니
+ * 클라이언트를 못 믿는다는 논리였고, 그 자체는 맞는 말이다. 그런데 그 대가로
+ * **줄을 챌 때마다 서버 왕복을 기다려야 했다** — 낚시에서 가장 짜릿해야 할 순간에
+ * 배포 환경에서는 수백 ms 짜리 빈칸이 생겼다.
+ *
+ * 검증이 실제로 막아주는 것도 없었다. 보상은 화면을 캡처해서 주인장에게 보내는
+ * 방식이고, 캡처는 어차피 위조할 수 있다. 코드가 진짜인지 확인할 수 있다는 건
+ * **주인장이 확인할 마음이 있을 때만** 의미가 있는데, 커피 한 잔에 그럴 일이 없다.
+ *
+ * 지키지도 못하는 것을 지키느라 매번 느려지는 거래였다. 지금은 즉시 나온다.
+ */

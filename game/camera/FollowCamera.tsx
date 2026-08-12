@@ -4,6 +4,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { damp3 } from "maath/easing";
 import { type RefObject, useEffect, useRef } from "react";
 import { type Group, PerspectiveCamera, Vector3 } from "three";
+import { getCameraShot } from "./cinematic";
 import { zoomOutForAspect } from "./framing";
 
 export interface FollowCameraProps {
@@ -41,6 +42,9 @@ const INTRO_MS = 2600;
 const INTRO_START_DISTANCE = 78;
 const INTRO_START_PITCH = 46;
 
+/** 연출에서 풀려난 뒤 이 시간 동안은 천천히 제자리로 돌아온다(ms). */
+const RETURN_MS = 1400;
+
 /** 0→1 을 부드럽게. 시작과 끝이 모두 느려야 "연출"로 읽힌다. */
 function easeInOut(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
@@ -56,6 +60,11 @@ export function FollowCamera({
 }: FollowCameraProps) {
   const camera = useThree((state) => state.camera);
   const startedAt = useRef(performance.now());
+  /** 지금 적용 중인 시야각. 연출이 넓혔다 좁혔다 하므로 매 프레임 감쇠시킨다. */
+  const activeFov = useRef(fov);
+  /** 연출이 카메라를 놓아준 시각과 그때의 미끄러짐. 돌아오는 길에 쓴다. */
+  const leftShotAt = useRef(-RETURN_MS);
+  const leftGlide = useRef(0);
 
   // 프레임마다 Vector3 를 새로 만들면 GC 가 초당 수백 개를 치운다. 두 개를 재사용한다.
   const desired = useRef(new Vector3()).current;
@@ -102,17 +111,68 @@ export function FollowCamera({
       target.position.y + height + Math.sin(pitch) * activeDistance,
       target.position.z + Math.cos(introSpin) * horizontal,
     );
-    damp3(camera.position, desired, activeSmooth, delta);
-
-    // 바라보는 지점도 같이 감쇠시킨다. 위치만 부드럽게 하고 lookAt 을 즉시 옮기면
-    // 화면 중심이 미세하게 떨린다.
     lookAt.set(
       target.position.x,
       target.position.y + height,
       target.position.z,
     );
-    damp3(focus, lookAt, activeSmooth, delta);
+
+    /**
+     * 연출이 카메라를 가져갔으면 목표만 갈아 끼운다.
+     *
+     * 전환 애니메이션을 따로 만들 필요가 없다 — 위치도 초점도 이미 감쇠로
+     * 따라가고 있으므로, 목표를 바꾸고 감쇠 시간을 늘리면 그게 곧 미끄러지는
+     * 카메라다. 돌아올 때도 같은 식이라 되돌리는 코드가 따로 없다.
+     */
+    const shot = getCameraShot();
+    let smooth = activeSmooth;
+    let wantFov = fov;
+    if (shot) {
+      desired.set(shot.px, shot.py, shot.pz);
+      if (shot.anchor) {
+        /**
+         * 세로로 긴 화면에서는 주인공에게서 더 물러난다.
+         * 따라다니는 카메라가 쓰는 것과 **같은 곡선**이라, 폰에서 갑자기
+         * 다른 규칙으로 움직이는 컷이 생기지 않는다.
+         */
+        const [ax, ay, az] = shot.anchor;
+        const zoom = zoomOutForAspect(state.size.width / state.size.height);
+        desired.set(
+          ax + (shot.px - ax) * zoom,
+          ay + (shot.py - ay) * zoom,
+          az + (shot.pz - az) * zoom,
+        );
+      }
+      lookAt.set(shot.tx, shot.ty, shot.tz);
+      smooth = shot.glide;
+      wantFov = shot.fov;
+      leftShotAt.current = performance.now();
+      leftGlide.current = shot.glide;
+    } else if (performance.now() - leftShotAt.current < RETURN_MS) {
+      /**
+       * 돌아올 때도 같은 속도로 미끄러진다.
+       *
+       * 이게 없으면 일어서는 순간 카메라가 **툭** 하고 제자리로 돌아온다 —
+       * 갈 때는 연출이었는데 올 때는 사고처럼 보인다.
+       */
+      smooth = leftGlide.current;
+    }
+
+    damp3(camera.position, desired, smooth, delta);
+    // 바라보는 지점도 같이 감쇠시킨다. 위치만 부드럽게 하고 lookAt 을 즉시 옮기면
+    // 화면 중심이 미세하게 떨린다.
+    damp3(focus, lookAt, smooth, delta);
     camera.lookAt(focus);
+
+    if (camera instanceof PerspectiveCamera) {
+      const next =
+        camera.fov + (wantFov - camera.fov) * Math.min(1, delta / 0.55);
+      if (Math.abs(next - camera.fov) > 0.002) {
+        camera.fov = next;
+        camera.updateProjectionMatrix();
+      }
+      activeFov.current = next;
+    }
   });
 
   return null;

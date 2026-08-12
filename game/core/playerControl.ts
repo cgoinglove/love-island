@@ -31,12 +31,25 @@ export interface PlayerController {
    * @returns 쿨다운에 걸리지 않고 실제로 나갔으면 true
    */
   shove(): boolean;
+
+  /**
+   * 그 자리에 딱 놓는다. 걸어가는 게 아니라 **옮겨 놓는** 것이다.
+   *
+   * 의자에 앉을 때 쓴다. 앉기는 "그 근처에 서 있기" 가 아니라 "그 자리에
+   * 정확히 놓이기" 라서, 걸어가서 멈추는 것으로는 절대 자세가 안 맞는다 —
+   * 30cm 만 어긋나도 의자 팔걸이를 뚫고 앉아 있는 그림이 된다.
+   *
+   * 속도도 같이 지운다. 안 그러면 놓자마자 관성으로 미끄러져 나간다.
+   */
+  place(x: number, z: number, yaw: number): void;
 }
 
 export interface PlayerPose {
   readonly x: number;
   readonly z: number;
   readonly yaw: number;
+  /** 지면 위 높이(m). 0 이면 땅에 붙어 있다 — 점프와 넉백이 여기 실린다. */
+  readonly y: number;
 }
 
 export const PlayerControllerContext =

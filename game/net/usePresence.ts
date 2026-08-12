@@ -18,7 +18,7 @@ export function usePresence(
       const pose = controllerRef.current?.pose();
       // 아직 캐릭터가 준비되지 않았으면 이번 차례는 건너뛴다.
       if (!pose) return null;
-      return { x: pose.x, z: pose.z, yaw: pose.yaw };
+      return { x: pose.x, z: pose.z, yaw: pose.yaw, y: pose.y };
     });
   }, [controllerRef]);
 }

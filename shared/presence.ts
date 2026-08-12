@@ -20,6 +20,14 @@ export const presenceBeat = z.object({
   z: z.number().finite().min(-45).max(45),
   /** 라디안. 서버는 범위만 보고 값을 해석하지 않는다. */
   yaw: z.number().finite().min(-10).max(10),
+  /**
+   * 지면 위 높이(m). 0 이면 땅에 붙어 있다.
+   *
+   * 이게 없어서 남의 점프와 넉백이 안 보였다 — 받는 쪽이 좌표의 지면 높이에
+   * 캐릭터를 붙여놓기 때문에 상대는 땅에 붙어 미끄러졌다.
+   * 예전 클라이언트가 안 보낼 수도 있으니 기본값을 둔다.
+   */
+  y: z.number().finite().min(0).max(20).default(0),
 });
 
 export type PresenceBeat = z.infer<typeof presenceBeat>;
@@ -30,6 +38,7 @@ export const presencePeer = z.object({
   x: z.number(),
   z: z.number(),
   yaw: z.number(),
+  y: z.number(),
 });
 
 export type PresencePeer = z.infer<typeof presencePeer>;
@@ -73,8 +82,41 @@ export const roomEventKind = z.enum([
   "bot",
   /** 봇에게 무언가 부탁한다. 소유자만 듣고 반응한다. */
   "botAsk",
+  /** 지금 뭘 하고 있는지(낚시 · 앉기). 아래 ACTIVITY_KINDS 참고. */
+  "act",
 ]);
 export type RoomEventKind = z.infer<typeof roomEventKind>;
+
+/**
+ * 지금 하고 있는 일.
+ *
+ * ── 왜 좌표 패킷이 아니라 사건인가 ──
+ * 좌표는 초당 20번 흐르는 값이라 한 바이트를 얹는 게 자연스러워 보인다. 그런데
+ * 그 패킷은 **폴백 경로에서 DB 테이블 컬럼**이다 — 컬럼 하나, 마이그레이션 하나,
+ * 서버 코드 세 곳이 따라 붙는다. 반면 이 값은 낚시를 시작할 때 한 번, 끝날 때
+ * 한 번 바뀐다. 초당 20번 보낼 이유가 없는 값을 초당 20번 가는 통로에 태우면
+ * 그 통로가 비싸질 뿐이다.
+ *
+ * 사건으로 보내면 P2P · 폴링 양쪽을 이미 타고, 중복 제거도 이미 돼 있다.
+ * 대신 **놓친 사람**이 생긴다(내가 낚시를 시작한 뒤에 들어온 사람). 그래서
+ * 하는 동안 몇 초에 한 번씩 같은 사실을 되풀이해 보낸다 — 늦게 온 사람도
+ * 한 박자면 따라잡고, 보내는 쪽이 갑자기 사라져도 TTL 이 알아서 정리한다.
+ */
+export const ACTIVITY_KINDS = ["fishing", "sitting"] as const;
+export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+
+export function isActivityKind(value: string): value is ActivityKind {
+  return (ACTIVITY_KINDS as readonly string[]).includes(value);
+}
+
+/** 하고 있는 중이라고 되풀이해 알리는 주기(ms). */
+export const ACTIVITY_BEAT_MS = 2500;
+/**
+ * 이만큼 소식이 없으면 그만둔 것으로 본다(ms).
+ *
+ * 주기의 세 배쯤이어야 한 번 놓쳤다고 남의 화면에서 낚싯대가 깜빡이지 않는다.
+ */
+export const ACTIVITY_TTL_MS = 8000;
 
 /**
  * 감정표현 파티클의 종류.

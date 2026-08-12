@@ -6,6 +6,7 @@ import { registerReactionHandler } from "@/game/net/roomEvents";
 import { serverNow } from "@/game/net/serverClock";
 import { CYCLE_SECONDS } from "@/game/world/dayNight";
 import { shellsToFire } from "@/game/world/nightShow";
+import { setParticleEmitter } from "@/game/world/particleBus";
 import { buildBurst } from "@/game/world/reactionBursts";
 import { ReactionPool } from "@/game/world/reactionPool";
 
@@ -45,6 +46,15 @@ export function Reactions() {
   useEffect(() => {
     pool.setViewportHeight(height);
   }, [pool, height]);
+
+  /**
+   * 네트워크를 안 타는 연출(물보라 등)이 풀에 직접 쓸 수 있게 문을 열어둔다.
+   * 드로우콜은 여전히 하나다 — 같은 링버퍼에 얹히기 때문이다.
+   */
+  useEffect(() => {
+    setParticleEmitter((specs) => pool.emit(specs, pool.now));
+    return () => setParticleEmitter(null);
+  }, [pool]);
 
   useEffect(() => {
     return registerReactionHandler((burst) => {

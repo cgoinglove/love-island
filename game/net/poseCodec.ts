@@ -10,13 +10,26 @@
  * three 도 react 도 모르는 순수 함수라 vitest 로 왕복을 검증한다.
  */
 
-/** 좌표 한 세트의 바이트 수: x(2) + z(2) + yaw(2) */
-export const POSE_BYTES = 6;
+/** 좌표 한 세트의 바이트 수: x(2) + z(2) + yaw(2) + y(2) */
+export const POSE_BYTES = 8;
 
 /** 섬이 반지름 17m 라 ±32m 면 넉넉하다. 이 범위를 넘는 값은 잘린다. */
 const POSITION_RANGE = 32;
 const POSITION_SCALE = 32767 / POSITION_RANGE;
 const YAW_SCALE = 32767 / Math.PI;
+
+/**
+ * 지면 위 높이(m)의 범위.
+ *
+ * ⚠ 이게 없어서 **남의 점프와 넉백이 안 보였다.** 패킷에 x·z·yaw 만 실려 있었고,
+ *   받는 쪽은 그 좌표의 지면 높이에 캐릭터를 붙여놨다. 그래서 상대는 점프해도
+ *   땅에 붙어 미끄러졌고, 밀쳐져 날아가는 포물선도 통째로 사라졌다.
+ *   본인 화면에서는 멀쩡히 뜨니 "싱크가 안 맞는다" 로 보인다.
+ *
+ * 점프 정점이 1.8m, 넉백 정점이 0.6m 다. 8m 면 넉넉하고 정밀도는 0.25mm 다.
+ */
+const HEIGHT_RANGE = 8;
+const HEIGHT_SCALE = 32767 / HEIGHT_RANGE;
 
 /**
  * int16 의 범위는 -32768 ~ 32767 로 비대칭이다.
@@ -32,16 +45,20 @@ export function encodePose(
   x: number,
   z: number,
   yaw: number,
+  y: number,
 ): void {
   view.setInt16(0, clampToInt16(x * POSITION_SCALE), true);
   view.setInt16(2, clampToInt16(z * POSITION_SCALE), true);
   view.setInt16(4, clampToInt16(wrapYaw(yaw) * YAW_SCALE), true);
+  view.setInt16(6, clampToInt16(y * HEIGHT_SCALE), true);
 }
 
 export interface DecodedPose {
   x: number;
   z: number;
   yaw: number;
+  /** 지면 위 높이(m). 0 이면 땅에 붙어 있다. */
+  y: number;
 }
 
 /** out 을 제자리에서 채운다. 초당 수십 번 도는 경로라 객체를 새로 만들지 않는다. */
@@ -49,6 +66,7 @@ export function decodePose(view: DataView, out: DecodedPose): void {
   out.x = view.getInt16(0, true) / POSITION_SCALE;
   out.z = view.getInt16(2, true) / POSITION_SCALE;
   out.yaw = view.getInt16(4, true) / YAW_SCALE;
+  out.y = view.getInt16(6, true) / HEIGHT_SCALE;
 }
 
 /**

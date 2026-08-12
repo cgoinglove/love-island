@@ -1,0 +1,1 @@
+ALTER TABLE "presence" ADD COLUMN "pos_y" real DEFAULT 0 NOT NULL;

@@ -37,6 +37,7 @@ const BOB_SPEED = 1.7;
 
 function Label({ item }: { item: Interactable }) {
   const groupRef = useRef<Group>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const controllerRef = usePlayerController();
 
   const [x, z] = item.position;
@@ -45,6 +46,32 @@ function Label({ item }: { item: Interactable }) {
   useFrame((state) => {
     const group = groupRef.current;
     if (!group) return;
+
+    /**
+     * 표시 거리가 정해진 이름표는 가까이 가야 나타난다.
+     *
+     * ⚠ `group.visible = false` 로는 안 사라진다. 이름표의 실체는 3D 오브젝트가
+     *   아니라 화면 위에 얹힌 **DOM** 이고(drei 의 Html), 그건 부모 그룹의
+     *   visible 을 보지 않는다. 실제로 그렇게 두고 "숨겼다" 고 착각했는데,
+     *   섬 반대편에서도 의자 이름표 둘이 방명록 이름표를 덮고 있었다.
+     *   버튼의 display 를 직접 끈다.
+     *
+     * 부드럽게 사라지지 않고 그냥 껐다 켠다. 투명도를 매 프레임 만지면 그만큼
+     * 스타일 재계산이 도는데, 이름표 하나 페이드 시키자고 낼 값이 아니다.
+     */
+    const range = item.labelRange;
+    if (range !== undefined) {
+      const pose = controllerRef.current?.pose();
+      const near =
+        pose !== undefined && Math.hypot(pose.x - x, pose.z - z) < range;
+      const button = buttonRef.current;
+      if (button) {
+        const want = near ? "" : "none";
+        if (button.style.display !== want) button.style.display = want;
+      }
+      if (!near) return;
+    }
+
     // id 로 위상을 어긋내야 여러 이름표가 한 몸처럼 같이 움직이지 않는다.
     const phase = item.id.length * 0.7;
     group.position.y =
@@ -56,6 +83,7 @@ function Label({ item }: { item: Interactable }) {
     <group ref={groupRef} position={[x, baseY, z]}>
       <Html center zIndexRange={[12, 0]} style={{ pointerEvents: "auto" }}>
         <button
+          ref={buttonRef}
           type="button"
           onPointerDown={(event) => {
             event.stopPropagation();
