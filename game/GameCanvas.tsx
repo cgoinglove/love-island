@@ -93,7 +93,7 @@ export function GameCanvas({ children, overlay, onReady }: GameCanvasProps) {
         shadows="percentage"
         // 모바일 dpr 은 3까지 올라간다 = 픽셀 9배. 1.5 에서 자른다. (기획서 §8.2)
         dpr={[1, 1.5]}
-        camera={{ position: [0, 12, 34], near: 0.5, far: 1600 }}
+        camera={{ position: [0, 12, 34], near: 0.5, far: 2600 }}
         gl={{
           antialias: true,
           // ACES 는 채도를 깎아 파스텔이 죽는다. 동물의숲 룩엔 Neutral 이 맞다. (기획서 §9)
@@ -102,8 +102,12 @@ export function GameCanvas({ children, overlay, onReady }: GameCanvasProps) {
       >
         <color attach="background" args={[SKY]} />
         {/* 곡률이 먼 바다를 지평선 아래로 접고, 안개가 그 경계를 지운다. */}
-        {/* 안개는 바다 끝만 지운다. 너무 가까이 걸면 하늘 그라데이션까지 씻어버린다. */}
-        <fog attach="fog" args={[SKY, 280, 760]} />
+        {/*
+          안개는 바다 끝만 지운다. 너무 가까이 걸면 하늘 그라데이션까지 씻어버린다.
+          섬이 세 배가 되면서 거리도 같이 밀었다 — 280m 짜리 안개는 이제
+          섬의 반대편 물가를 지운다.
+        */}
+        <fog attach="fog" args={[SKY, 620, 1900]} />
 
         <Suspense fallback={null}>
           <PlayerControllerContext.Provider value={controllerRef}>

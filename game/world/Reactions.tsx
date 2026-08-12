@@ -60,7 +60,7 @@ export function Reactions() {
     return registerReactionHandler((burst) => {
       // 셰이더와 같은 시계를 써야 delay 가 맞는다. useFrame 이 매 프레임 넣어준다.
       pool.emit(
-        buildBurst(burst.kind, burst.x, burst.z, Math.random),
+        buildBurst(burst.kind, burst.x, burst.z, Math.random, burst.power),
         pool.now,
       );
     });

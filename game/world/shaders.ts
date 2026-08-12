@@ -38,13 +38,13 @@ export const CURVATURE_VERTEX = /* glsl */ `
 /**
  * island.ts 의 shoreRadiusAt / shoreDistance 를 그대로 옮긴 것 — **하트 모양**이다.
  *
- * ⚠ 40.0 은 ISLAND_BASE_RADIUS, 나머지는 하트를 근사한 사인 급수 계수다.
+ * ⚠ 56.0 은 ISLAND_BASE_RADIUS, 나머지는 하트를 근사한 사인 급수 계수다.
  *   한쪽만 고치면 물거품이 실제 해안선에서 떨어진 곳에 생긴다.
  *   반지름만 안 고쳐서 9m 어긋났던 적이 있고, shoreSync.test.ts 가 그래서 있다.
  */
 export const SHORE_GLSL = /* glsl */ `
   float shoreRadiusAt(float angle) {
-    return 40.0 * (
+    return 56.0 * (
       0.7747
       - 0.0268 * sin(angle)
       - 0.1665 * sin(3.0 * angle)

@@ -7,12 +7,14 @@ import {
   applyImpulse,
   createPlayerState,
   DEFAULT_MOVE,
+  DRY_WORLD,
   IDLE_INTENT,
   interpolatePose,
   type MoveIntent,
   type PlayerState,
   type RenderPose,
   stepPlayer,
+  type WaterModel,
 } from "./simulation";
 
 const walk = (axis: Vec2XZ, sprint = false): MoveIntent => ({
@@ -409,5 +411,190 @@ describe("축의 길이가 세기다", () => {
       0,
     );
     expect(half).toBeLessThan(full * 0.6);
+  });
+});
+
+describe("물", () => {
+  /** 섬 대신 쓰는 아주 단순한 물: x > 4 부터 바다이고, x < 8 까지만 헤엄쳐 나갈 수 있다. */
+  const SEA: WaterModel = {
+    groundHeight: (x) => (x > 4 ? -1.5 : 1),
+    // 물가(x=4)에서 얼마나 나갔나. 안쪽은 0 이라 물가에 조금 겹친다.
+    offshore: (x) => Math.max(0, x - 3.2),
+  };
+  /**
+   * 물 위는 **걸을 수 없는** 그리드. 실제 섬과 같은 구성이다 —
+   * 네비 그리드가 이미 물을 막고 있고, WaterModel 은 "그럼에도 떠서 갈 수 있는 곳"
+   * 을 따로 알려준다. 둘을 어긋나게 두면(그리드는 다 걸을 수 있다고 하고 물만 따로)
+   * 헤엄 제한이 통째로 무의미해진다.
+   */
+  const SHORE: NavGrid = buildNavGrid(
+    FIELD_SPEC,
+    (x) => x < 4,
+    DEFAULT_MOVE.radius,
+  );
+
+  function swim(state: PlayerState, intent: MoveIntent, steps: number): void {
+    for (let i = 0; i < steps; i += 1) {
+      stepPlayer(state, intent, FIXED_DT, DEFAULT_MOVE, SHORE, SEA);
+    }
+  }
+
+  it("밀쳐지면 물 위로 날아간다", () => {
+    /**
+     * 예전엔 아무리 세게 밀쳐도 물가에서 딱 멈췄다 — 수평 이동이 언제나
+     * "걸을 수 있는 칸인가" 만 봤기 때문이다. 밀치기가 아무 결과도 못 낳던 이유.
+     */
+    const state = createPlayerState(3, 0);
+    applyImpulse(state, 30, 0, 7);
+    swim(state, IDLE_INTENT, 120);
+    expect(state.x).toBeGreaterThan(4);
+    expect(state.swimming).toBe(true);
+  });
+
+  it("물에 떠 있는 동안 수면까지 떠오른다", () => {
+    // 바닥에 그대로 두면 물에 빠진 사람이 해저에 서 있게 된다.
+    const state = createPlayerState(3, 0);
+    applyImpulse(state, 30, 0, 7);
+    swim(state, IDLE_INTENT, 120);
+    // 지형이 -1.5 이므로 1.5 만큼 떠올라야 월드 높이가 해수면(0)이 된다.
+    expect(state.y).toBeCloseTo(1.5, 5);
+  });
+
+  it("헤엄치면 걷는 것보다 느리다", () => {
+    // 둘 다 물가와 나란히(북쪽으로) 간다. 한쪽만 물로 걸어 들어가면 비교가 안 된다.
+    const walking = createPlayerState(0, 0);
+    swim(walking, walk([0, 1]), 60);
+
+    const paddling = createPlayerState(6, 0);
+    swim(paddling, walk([0, 1]), 60);
+
+    expect(paddling.swimming).toBe(true);
+    expect(Math.abs(paddling.vz)).toBeLessThan(Math.abs(walking.vz) * 0.5);
+  });
+
+  it("먼바다로는 못 나간다", () => {
+    /**
+     * ⚠ 게임 규칙이 아니라 **통신 계약**이다. presenceBeat 의 좌표는 ±45 까지만
+     *   받으므로, 끝없이 헤엄쳐 나가면 위치 전송이 통째로 튕긴다.
+     */
+    const state = createPlayerState(6, 0);
+    swim(state, walk([1, 0], true), 400);
+    expect(state.x).toBeLessThan(8);
+  });
+
+  it("물에서는 못 뛴다", () => {
+    const state = createPlayerState(6, 0);
+    swim(state, IDLE_INTENT, 30);
+    expect(state.swimming).toBe(true);
+    swim(state, JUMP, 1);
+    expect(state.vy).toBe(0);
+  });
+
+  it("물가의 문턱에 걸리지 않는다", () => {
+    /**
+     * ⚠ 물이 끝나는 자리(지형 0.1m)와 걸을 수 있는 자리(거기서 몸 두께만큼
+     *   더 안쪽)는 다르다. 그 사이 35cm 에 들어서면 헤엄은 끝났는데 걸을 곳은
+     *   없어서 **한 발짝도 못 움직인다** — 헤엄쳐 올라올 때마다 턱 걸렸다.
+     *
+     * 여기서는 그 틈을 SEA 로 흉내낸다: 물은 x>4 에서 끝나지만 걸을 수 있는
+     * 칸은 x<3.6 부터다.
+     */
+    const NARROW: NavGrid = buildNavGrid(
+      FIELD_SPEC,
+      (x) => x < 3.6,
+      DEFAULT_MOVE.radius,
+    );
+    const state = createPlayerState(3.8, 0);
+    const before = state.x;
+    for (let i = 0; i < 60; i += 1) {
+      stepPlayer(state, walk([-1, 0]), FIXED_DT, DEFAULT_MOVE, NARROW, SEA);
+    }
+    expect(state.x).toBeLessThan(before - 0.5);
+  });
+
+  it("헤엄쳐 물가로 돌아오면 다시 걷는다", () => {
+    const state = createPlayerState(6, 0);
+    swim(state, walk([-1, 0]), 200);
+    expect(state.x).toBeLessThan(4);
+    expect(state.swimming).toBe(false);
+    expect(state.y).toBe(0);
+  });
+});
+
+describe("먼바다에 떨어졌을 때", () => {
+  /** 물가가 x=4 이고, 그 밖은 어디까지나 바다인 세계. */
+  const OPEN_SEA: WaterModel = {
+    groundHeight: (x) => (x > 4 ? -2 : 1),
+    offshore: (x) => Math.max(0, x - 4),
+  };
+  const SHORE: NavGrid = buildNavGrid(
+    FIELD_SPEC,
+    (x) => x < 4,
+    DEFAULT_MOVE.radius,
+  );
+
+  it("헤엄쳐 뭍으로 돌아올 수 있다", () => {
+    /**
+     * ⚠ 예전엔 "물가에서 4m 안쪽만 헤엄칠 수 있다" 로만 판정했다. 그러면 어쩌다
+     *   더 멀리 떨어진 사람이 — 열기구에서 뛰어내리거나 세게 밀쳐져서 —
+     *   **사방이 막힌 채 물 위에 굳는다.** 나가는 것만 막아야 바다가 감옥이
+     *   아니라 조류가 된다.
+     */
+    const state = createPlayerState(20, 0);
+    for (let i = 0; i < 900; i += 1) {
+      stepPlayer(state, walk([-1, 0]), FIXED_DT, DEFAULT_MOVE, SHORE, OPEN_SEA);
+    }
+    expect(state.x).toBeLessThan(4);
+    expect(state.swimming).toBe(false);
+  });
+
+  it("바깥으로는 여전히 못 나간다", () => {
+    const state = createPlayerState(5, 0);
+    for (let i = 0; i < 900; i += 1) {
+      stepPlayer(state, walk([1, 0]), FIXED_DT, DEFAULT_MOVE, SHORE, OPEN_SEA);
+    }
+    expect(state.x).toBeLessThan(9);
+  });
+});
+
+describe("걸어서 물에 들어가기", () => {
+  const SEA: WaterModel = {
+    groundHeight: (x) => (x > 4 ? -1.5 : 1),
+    offshore: (x) => Math.max(0, x - 3.2),
+  };
+  const SHORE: NavGrid = buildNavGrid(
+    FIELD_SPEC,
+    (x) => x < 4,
+    DEFAULT_MOVE.radius,
+  );
+
+  it("점프하지 않아도 물가로 걸어 들어간다", () => {
+    /**
+     * ⚠ 예전엔 걸어다닐 때 **땅만** 갈 수 있었다. 그래서 물에 들어가려면
+     *   물가에서 뛰어야 했다 — 헤엄이라는 기능이 있는데 들어가는 방법이
+     *   점프뿐인 건 아무도 못 알아챈다.
+     */
+    const state = createPlayerState(2, 0);
+    for (let i = 0; i < 200; i += 1) {
+      stepPlayer(state, walk([1, 0]), FIXED_DT, DEFAULT_MOVE, SHORE, SEA);
+    }
+    expect(state.x).toBeGreaterThan(4);
+    expect(state.swimming).toBe(true);
+  });
+
+  it("나무는 여전히 막는다", () => {
+    // 물만 통과시킨다. 안 그러면 걸어서 야자수를 뚫고 지나간다.
+    const state = createPlayerState(0, 0);
+    for (let i = 0; i < 200; i += 1) {
+      stepPlayer(
+        state,
+        walk([1, 0]),
+        FIXED_DT,
+        DEFAULT_MOVE,
+        PILLAR,
+        DRY_WORLD,
+      );
+    }
+    expect(canStandAt(PILLAR, state.x, state.z)).toBe(true);
   });
 });

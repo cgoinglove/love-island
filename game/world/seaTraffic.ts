@@ -34,11 +34,12 @@ function hashUnit(slot: number, salt: number): number {
  *
  * ⚠ z 값은 취향이 아니라 **두 개의 제약이 만나는 자리**다.
  *
- *   1. 육지를 피해야 한다. 섬은 하트라 북쪽 봉우리가 x=±20 근처에서 z=-30 까지
- *      밀고 나온다. z=-31 항로는 여유가 1m 밖에 없어서 배가 바위를 스친다.
+ *   1. 육지를 피해야 한다. 섬은 하트라 북쪽 봉우리가 x=±40 근처에서 z=-89 까지
+ *      밀고 나온다(x=±27 에서 z=-59). 그보다 안쪽 항로는 배가 뭍으로 올라간다.
  *   2. **수평선 안쪽이어야 한다.** 곡률이 거리 제곱으로 바다를 접어 내리므로,
- *      눈높이 2.8m(앉았을 때)에서 보이는 바다는 46m 까지다. 그보다 먼 배는
- *      수평선 너머라 아예 없는 것과 같다 — 의자에서 z=-59 가 그 한계다.
+ *      눈높이 3.2m(의자에 앉았을 때)에서 보이는 바다는 49m 까지다. 그보다 먼
+ *      배는 수평선 너머라 아예 없는 것과 같다 — 의자 카메라(z=-56)에서
+ *      z=-86 이 그 한계이고, 봉우리를 피하는 z=-66 이 그 사이에 넉넉히 들어간다.
  *
  * 셋을 다른 거리에 두는 건 원근을 만들기 위해서다. 가까운 배는 작고 빠르게
  * 지나가고, 먼 배는 크고 느리게 미끄러진다.
@@ -66,7 +67,7 @@ interface Lane {
  * 수평선이 46m 밖에 안 되므로 항로를 더 멀리 물릴 수도 없다.
  */
 const LANES: readonly Lane[] = [
-  { z: -44, speed: 3.1, direction: 1, phase: 0.42, scale: 0.85 },
+  { z: -48, speed: 3.1, direction: 1, phase: 0.42, scale: 0.85 },
 ];
 
 /**
@@ -91,7 +92,19 @@ export interface BoatSighting {
   /** 좌우로 기우는 각(라디안). */
   readonly roll: number;
   readonly scale: number;
+  /**
+   * 0 이면 안 보이고 1 이면 또렷하다.
+   *
+   * ⚠ 항로 끝에서 배는 **되돌아간다** — 오른쪽 끝에 닿은 배가 다음 프레임에
+   *   왼쪽 끝에 있다. 그 순간이 화면 밖이면 문제가 없지만, 보는 사람이 섬
+   *   어디에 서 있느냐에 따라 화면이 따라 움직이므로 "늘 밖" 이 보장되지 않는다.
+   *   되돌아가기 전후로 흐려두면 어디서 보든 **안개에 녹아드는** 것으로 보인다.
+   */
+  readonly fade: number;
 }
+
+/** 끝에서 흐려지기 시작하는 거리(m). */
+const FADE_MARGIN = 26;
 
 export function boatsAt(seconds: number): BoatSighting[] {
   return LANES.map((lane, index) => {
@@ -113,6 +126,7 @@ export function boatsAt(seconds: number): BoatSighting[] {
       bob: Math.sin(seconds * 0.9 + index * 2.1) * 0.13 * lane.scale,
       roll: Math.sin(seconds * 0.7 + index * 1.3) * 0.045,
       scale: lane.scale,
+      fade: Math.min(1, (LANE_SPAN - Math.abs(x)) / FADE_MARGIN),
     };
   });
 }
@@ -179,16 +193,52 @@ export function finsAt(seconds: number): FinSighting[] {
  * 물이 투명해서 수면 아래가 다 보인다. 지느러미만 지나가고 물속이 비어 있으면
  * 그 투명함이 장점이 아니라 결함이 된다 — 볼 게 없다는 걸 보여줄 뿐이다.
  */
-const SCHOOL: Patrol = { offshore: 4.5, period: -95, phase: 0.42 };
+const SCHOOLS: readonly Patrol[] = [
+  { offshore: 4.5, period: -95, phase: 0.42 },
+  { offshore: 9, period: 128, phase: 0.11 },
+  { offshore: 6.5, period: -164, phase: 0.73 },
+];
 
-export function schoolAt(seconds: number): FinSighting {
-  return patrolAt(SCHOOL, seconds, 0);
+export function schoolsAt(seconds: number): FinSighting[] {
+  return SCHOOLS.map((school, index) => patrolAt(school, seconds, index));
+}
+
+// ── 모래밭의 꽃게 ───────────────────────────────────
+
+/**
+ * 꽃게는 **물가를 따라 옆으로** 걷는다.
+ *
+ * 상어와 같은 방식으로 해안선에서 좌표를 뽑되, 물이 아니라 **뭍 쪽으로**
+ * 조금 들어온 자리다. 그러면 어느 각도에 있든 늘 모래밭 위이고,
+ * 지형이 바뀌어도 따라온다 — 손으로 좌표를 박으면 섬 크기를 바꿀 때마다
+ * 바다 한가운데나 잔디밭에서 게가 걸어다닌다.
+ *
+ * 게는 옆으로 걷는다. 진행 방향에 몸을 90° 틀어 놓는 게 그 표현이다.
+ */
+const CRAB_WALKS: readonly Patrol[] = [
+  { offshore: -2.2, period: 210, phase: 0.08 },
+  { offshore: -3.4, period: -260, phase: 0.55 },
+  { offshore: -1.6, period: 320, phase: 0.77 },
+  { offshore: -2.8, period: -178, phase: 0.31 },
+  { offshore: -4.2, period: 244, phase: 0.92 },
+];
+
+export function crabsAt(seconds: number): FinSighting[] {
+  return CRAB_WALKS.map((walk, index) => {
+    const spot = patrolAt(walk, seconds, index);
+    /**
+     * 게걸음. 몸은 옆을 보고 가되, 몇 초에 한 번 방향을 홱 바꾼다 —
+     * 늘 같은 쪽으로만 가면 그건 컨베이어 벨트에 얹힌 물건이다.
+     */
+    const flip = Math.sin(seconds * 0.35 + index * 2.4) > 0 ? 1 : -1;
+    return { ...spot, yaw: spot.yaw + (Math.PI / 2) * flip };
+  });
 }
 
 // ── 튀어오르는 물고기 ────────────────────────────────
 
 /** 물고기가 한 번 튀어오르는 간격(초). */
-const JUMP_PERIOD = 4.5;
+const JUMP_PERIOD = 2.2;
 /** 물 밖에 나와 있는 시간(초). */
 export const JUMP_SECONDS = 1.05;
 /** 튀어오르는 높이(m). */
@@ -257,4 +307,173 @@ export function jumpHeightAt(progress: number): number {
  */
 export function jumpPitchAt(progress: number): number {
   return Math.cos(progress * Math.PI) * 1.1;
+}
+
+// ── 고래 ────────────────────────────────────────────
+
+/**
+ * 하루에 **두 번**, 낮에 한 번 밤에 한 번 고래가 지나간다.
+ *
+ * ── 왜 상시가 아닌가 ──
+ * 배·상어·물고기와는 성격이 다르다. 저것들은 바다가 살아 있다는 **배경**이라
+ * 늘 돌아도 되지만, 20m 짜리 고래가 늘 앞바다에 있으면 그건 사건이 아니라
+ * 풍경이고, 두 번째 보는 순간 아무도 안 쳐다본다. 하루 두 번이면 앉아 있는
+ * 3분 안에 볼 수도 못 볼 수도 있다 — 못 볼 수 있어야 봤을 때 사건이 된다.
+ *
+ * 낮과 밤에 한 번씩인 건 같은 장면을 **두 가지 빛으로** 보여주기 위해서다.
+ * 밤 고래는 실루엣만 보이고 분수만 하얗게 선다.
+ *
+ * 시각이 정하므로 옆 사람과 같은 순간에 같은 걸 본다 — 통신은 0 바이트다.
+ */
+const WHALE_SHOWS: readonly number[] = [0.22, 0.78];
+/** 한 번의 쇼가 걸리는 시간(초). */
+const WHALE_SECONDS = 30;
+/**
+ * 다니는 깊이(z). 항로(-48)보다 **뒤**다.
+ *
+ * ⚠ 세 겹 뒤다 — 항로(-48) · 깃발(-66) 다음이 고래이고, 그 뒤가 먼 섬이다.
+ *   의자 카메라에서 108m. 이 거리에서 곡률이 바다를 15m 끌어내리므로
+ *   **물 위로 나온 부분만** 보인다. 30m 짜리를 여기 두면 화면에서는
+ *   가까운 15m 짜리와 비슷한 크기인데, 배와 깃발이 그 앞에 있어서
+ *   "얼마나 멀리 있는 게 저만큼 크다" 가 읽힌다 — 웅장함은 크기가 아니라
+ *   크기와 거리의 조합이다.
+ *
+ * ⚠ 더 높이 뛰게 할 수는 없다. 이 거리에서 20m 를 넘게 솟으면 카메라가
+ *   쓸 수 있는 하늘(수평선 위 10°)을 넘어 코가 화면 밖으로 잘린다.
+ */
+const WHALE_Z = -112;
+
+export interface WhaleSighting {
+  /** 몇 번째 쇼인가. 같은 물보라를 두 번 터뜨리지 않으려고 호출부가 기억한다. */
+  readonly key: number;
+  readonly x: number;
+  readonly z: number;
+  readonly yaw: number;
+  /** 수면 기준 높이(m). 음수면 물속이다. */
+  readonly y: number;
+  readonly pitch: number;
+  readonly roll: number;
+  /**
+   * 지금 어느 대목인가. 0 접근 · 1·2 분수 · 3 잠수 · 4 도약 · 5 착수 · 6 퇴장.
+   *
+   * 물보라와 분수는 **대목이 바뀌는 순간**에 한 번씩 터진다. 시간으로 재면
+   * 프레임이 걸러진 사이에 그 순간을 통째로 건너뛴다.
+   */
+  readonly stage: number;
+}
+
+/** 0→1 을 부드럽게. 시작과 끝의 속도가 0 이라 몸이 홱 꺾이지 않는다. */
+function ease(t: number): number {
+  const c = Math.min(Math.max(t, 0), 1);
+  return c * c * (3 - 2 * c);
+}
+
+/**
+ * 0 접근 · 1 분수 · 2 헤엄 · 3 잠수 · 4 도약 · 5 착수 · 6 퇴장.
+ *
+ * ⚠ 분수는 **한 번**이다. 두 번 뿜게 했더니 둘 다 어중간해졌다 —
+ *   100m 밖에서 벌어지는 일이라 눈길을 끄는 데 한 번은 필요하고,
+ *   그 한 번이 크면 두 번째는 방해만 된다.
+ */
+function stageOf(p: number): number {
+  if (p < 0.2) return 0;
+  if (p < 0.3) return 1;
+  if (p < 0.42) return 2;
+  if (p < 0.62) return 3;
+  if (p < 0.84) return 4;
+  if (p < 0.9) return 5;
+  return 6;
+}
+
+/**
+ * 지금 물 위에 고래가 있으면 그 자세.
+ *
+ * 한 번의 쇼는 **떠오름 → 분수 두 번 → 꼬리 들고 잠수 → 크게 도약 → 착수** 다.
+ * 도약을 마지막에 두는 건 앞의 20초가 전부 그걸 위한 **예고**이기 때문이다 —
+ * 분수를 보고 고개를 돌린 사람이 도약을 본다.
+ */
+export function whaleAt(seconds: number, cycle: number): WhaleSighting | null {
+  for (const [index, at] of WHALE_SHOWS.entries()) {
+    const since = seconds - at * cycle;
+    const round = Math.floor(since / cycle);
+    const local = since - round * cycle;
+    if (local < 0 || local > WHALE_SECONDS) continue;
+
+    const p = local / WHALE_SECONDS;
+
+    /**
+     * 등이 수면에 걸친 높이.
+     *
+     * ⚠ 이 거리에서는 **물 밖에 나온 만큼만** 보인다. 곡률이 바다를 15m
+     *   끌어내리므로 수평선 위로 얼굴을 내미는 건 해수면보다 높은 부분뿐이고,
+     *   가까이 있을 때처럼 등을 살짝만 내놓으면 아무것도 안 보인다.
+     */
+    const CRUISE = 1.1;
+    let y = -6 + ease(p / 0.16) * (CRUISE + 6);
+    let pitch = 0;
+
+    if (p > 0.4) {
+      // 꼬리를 들고 내려간다. 머리가 먼저 들어가므로 앞으로 숙인다.
+      const dive = ease((p - 0.4) / 0.2);
+      y = CRUISE - dive * 9;
+      pitch = dive * 0.75;
+    }
+    if (p > 0.62) {
+      /**
+       * 도약. 물속에서 속도를 붙여 비스듬히 솟았다가 옆으로 넘어지며 떨어진다.
+       * 올라가는 데 걸리는 시간이 내려오는 것보다 길어야 **무겁게** 보인다.
+       */
+      const rise = ease((p - 0.62) / 0.16);
+      const fall = ease((p - 0.78) / 0.08);
+      /**
+       * ⚠ 높이 한계는 거리가 정한다. 카메라가 수평선 위로 쓸 수 있는 하늘이
+       *   10° 뿐이라, 108m 밖이면 **꼭대기가 20m** 를 넘는 순간 잘린다.
+       *   30m 짜리가 48° 로 서면 코가 그 언저리다 — 여기가 상한이다.
+       */
+      y = -9 + rise * 13.5 - fall * 15;
+      pitch = -0.6 * rise + fall * 1.1;
+    }
+    if (p > 0.9) {
+      y = Math.min(y, -1.5 - ease((p - 0.9) / 0.1) * 6);
+      pitch = 0.2;
+    }
+
+    /**
+     * 헤엄치는 흔들림.
+     *
+     * ⚠ 이게 없으면 **죽은 고래**다. 자리만 옮겨 놓으면 30m 짜리가 수면을
+     *   미끄러져 지나가는 그림이 되는데, 그건 헤엄치는 게 아니라 떠내려가는
+     *   것이다. 물 위에 있는 동안 몸이 오르내리고 고개가 같이 끄덕여야 한다.
+     *   꼬리는 그리는 쪽이 따로 젓는다(SeaLife).
+     */
+    if (p < 0.42) {
+      const stroke = seconds * 1.25;
+      y += Math.sin(stroke) * 0.42;
+      pitch += Math.cos(stroke) * 0.1;
+    }
+
+    return {
+      key: round * WHALE_SHOWS.length + index,
+      /**
+       * 서→동.
+       *
+       * ⚠ 도약하는 자리를 **깃발에서 비켜** 놓는다. 한가운데로 잡았더니
+       *   15m 짜리가 배너 기둥 사이에서 솟아 둘 다 못 보는 그림이 됐다.
+       *   분수는 가운데(x≈-5)에서 뿜고 도약은 오른쪽(x≈18)에서 한다 —
+       *   먼저 눈길을 끌고 그 다음에 옆에서 터지는 순서다.
+       */
+      x: -16 + p * 44,
+      z: WHALE_Z,
+      yaw: -Math.PI / 2,
+      y,
+      pitch,
+      /**
+       * 도약하면서 몸을 조금 튼다. 90° 눕히면 옆구리로 떨어지는 그림이 되는데,
+       * 그러면 정면에서 볼 때 몸통이 통째로 넓게 퍼져 고래가 아니라 판이 된다.
+       */
+      roll: p > 0.7 ? ease((p - 0.7) / 0.18) * 0.35 : 0,
+      stage: stageOf(p),
+    };
+  }
+  return null;
 }

@@ -13,6 +13,7 @@ import { isTypingTarget } from "@/game/core/input/keyboard";
 import { useInteractable } from "@/game/core/interactable";
 import { elevationAt } from "@/game/core/island";
 import { usePlayerController } from "@/game/core/playerControl";
+import { useHudStore } from "@/game/hud/store";
 import { useBroadcastActivity } from "@/game/net/activity";
 import { CurvedMaterial } from "@/game/world/curvature";
 import { mergeColored, type Piece } from "@/game/world/meshKit";
@@ -142,6 +143,13 @@ export function Chairs() {
 
   // 앉아 있다는 걸 남들에게 알린다. 남의 화면에서도 의자에 파묻혀 앉는다.
   useBroadcastActivity("sitting", seated !== null);
+
+  // 앉으면 걸어다니는 UI 를 접는다. 지금은 보는 시간이다.
+  const setImmersive = useHudStore((state) => state.setImmersive);
+  useEffect(() => {
+    setImmersive(seated !== null);
+    return () => setImmersive(false);
+  }, [seated, setImmersive]);
 
   /**
    * 앉는 동안 카메라를 가져간다.

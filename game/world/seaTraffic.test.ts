@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import { elevationAt } from "@/game/core/island";
 import {
   boatsAt,
+  crabsAt,
   finsAt,
   JUMP_SECONDS,
   jumpHeightAt,
   jumpPitchAt,
   jumpsAt,
   LANE_SPAN,
+  whaleAt,
 } from "./seaTraffic";
 
 /**
@@ -139,5 +141,169 @@ describe("튀어오르는 물고기", () => {
   it("도약 시간이 슬롯을 넘지 않는다", () => {
     // 넘으면 두 도약이 겹쳐서 같은 물고기가 둘로 보인다.
     expect(JUMP_SECONDS).toBeLessThan(4.5);
+  });
+});
+
+describe("모래밭의 꽃게", () => {
+  it("늘 마른 땅 위에 있다", () => {
+    /**
+     * 해안선에서 좌표를 뽑되 **뭍 쪽으로** 들어와야 한다. 부호를 뒤집으면
+     * 게가 바다 위를 걸어다니고, 너무 들어오면 잔디밭에서 걸어다닌다.
+     */
+    for (let t = 0; t < 700; t += 2) {
+      for (const crab of crabsAt(t)) {
+        const ground = elevationAt(crab.x, crab.z);
+        expect(ground).toBeGreaterThan(0.1);
+        // 물가의 모래밭이지 언덕이 아니다. 얕은 턱(0.75)보다 조금만 위.
+        expect(ground).toBeLessThan(0.95);
+      }
+    }
+  });
+
+  it("같은 시각이면 어디서 계산해도 같은 자리다", () => {
+    expect(crabsAt(482.5)).toEqual(crabsAt(482.5));
+  });
+
+  it("옆으로 걷는다", () => {
+    // 게는 진행 방향에 몸을 90° 튼다. 앞을 보고 걸으면 그건 게가 아니다.
+    for (const t of [0, 61, 143]) {
+      const now = crabsAt(t);
+      const next = crabsAt(t + 0.5);
+      for (const [index, crab] of now.entries()) {
+        const ahead = next[index];
+        if (!ahead) continue;
+        const moved = Math.atan2(-(ahead.x - crab.x), -(ahead.z - crab.z));
+        const gap = Math.abs(
+          Math.atan2(Math.sin(moved - crab.yaw), Math.cos(moved - crab.yaw)),
+        );
+        expect(Math.abs(gap - Math.PI / 2)).toBeLessThan(0.25);
+      }
+    }
+  });
+});
+
+describe("고래", () => {
+  /** 시험용 하루. 실제 값(dayNight)과 무관하게 규칙만 본다. */
+  const CYCLE = 180;
+
+  it("하루에 낮 한 번 밤 한 번만 나온다", () => {
+    const shows = new Set<number>();
+    let onstage = 0;
+    for (let t = 0; t < CYCLE; t += 0.25) {
+      const whale = whaleAt(t, CYCLE);
+      if (!whale) continue;
+      shows.add(whale.key);
+      onstage += 0.25;
+    }
+    expect(shows.size).toBe(2);
+    /**
+     * 없는 시간이 있는 시간보다 길어야 한다. 늘 앞바다에 떠 있으면 그건
+     * 사건이 아니라 풍경이고, 두 번째 보는 순간 아무도 안 쳐다본다.
+     */
+    expect(onstage).toBeLessThan(CYCLE / 2);
+  });
+
+  it("한 번은 낮, 한 번은 밤에 나온다", () => {
+    // 하루를 반으로 갈라 앞이 낮, 뒤가 밤이다(정오 0.25 · 자정 0.75).
+    const phases = new Set<string>();
+    for (let t = 0; t < CYCLE; t += 0.25) {
+      if (whaleAt(t, CYCLE)) phases.add(t < CYCLE / 2 ? "낮" : "밤");
+    }
+    expect([...phases].sort()).toEqual(["낮", "밤"]);
+  });
+
+  it("육지 위로 올라오지 않는다", () => {
+    for (let t = 0; t < CYCLE * 2; t += 0.25) {
+      const whale = whaleAt(t, CYCLE);
+      if (!whale) continue;
+      expect(elevationAt(whale.x, whale.z)).toBeLessThan(FLOATABLE);
+    }
+  });
+
+  it("분수 · 잠수 · 도약 · 착수를 순서대로 한 번씩 지난다", () => {
+    /**
+     * 물보라는 **대목이 바뀌는 순간**에 터진다. 단계가 뒤로 돌아가거나
+     * 건너뛰면 같은 분수가 두 번 터지거나 착수가 통째로 빠진다.
+     */
+    const seen: number[] = [];
+    let last = -1;
+    for (let t = 0; t < CYCLE; t += 0.05) {
+      const whale = whaleAt(t, CYCLE);
+      if (!whale || whale.key !== 0) continue;
+      if (whale.stage !== last) {
+        seen.push(whale.stage);
+        last = whale.stage;
+      }
+    }
+    expect(seen).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+
+  it("도약할 때만 물 밖으로 크게 솟는다", () => {
+    let peak = { y: -99, stage: -1 };
+    for (let t = 0; t < CYCLE; t += 0.05) {
+      const whale = whaleAt(t, CYCLE);
+      if (whale && whale.y > peak.y) peak = { y: whale.y, stage: whale.stage };
+    }
+    /**
+     * 몸의 절반 넘게 나와야 도약이다.
+     *
+     * ⚠ 무작정 높이 뛰면 안 된다 — 카메라가 쓸 수 있는 하늘은 수평선 위
+     *   10° 뿐이라, 108m 밖에서 몸 꼭대기가 20m 를 넘으면 화면 밖으로 잘린다.
+     *   30m 짜리가 34° 로 솟으면 코가 13m 언저리로 딱 들어온다. 한 번
+     *   48° 로 세웠다가 코가 화면 위로 잘려 나갔다.
+     */
+    expect(peak.y).toBeGreaterThan(3.5);
+    expect(peak.y).toBeLessThan(6);
+    expect(peak.stage).toBe(4);
+  });
+
+  it("같은 시각이면 어디서 계산해도 같은 자세다", () => {
+    /**
+     * 결정성이 필요한 건 **같은 순간을 보는 두 사람**이다. 이게 깨지면
+     * 옆 사람과 다른 고래를 보게 된다.
+     *
+     * ⚠ 어제와 오늘이 같을 필요는 없다. 헤엄치는 흔들림은 하루 주기와
+     *   무관한 박자로 도므로(1.25 rad/s) 날마다 조금씩 다른 자세로 나타난다 —
+     *   그게 오히려 맞다. 같은 쇼가 매번 프레임 단위로 똑같으면 그건 녹화다.
+     */
+    expect(whaleAt(41.5, CYCLE)).toEqual(whaleAt(41.5, CYCLE));
+    expect(whaleAt(52.25, CYCLE)).toEqual(whaleAt(52.25, CYCLE));
+  });
+
+  it("물 위에 있는 동안 몸이 오르내린다", () => {
+    /**
+     * 자리만 옮겨 놓으면 **죽은 고래**다 — 30m 짜리가 수면을 미끄러져
+     * 지나가는 건 헤엄치는 게 아니라 떠내려가는 것이다.
+     */
+    const heights: number[] = [];
+    for (let t = 0.22 * CYCLE + 3; t < 0.22 * CYCLE + 11; t += 0.2) {
+      const whale = whaleAt(t, CYCLE);
+      if (whale) heights.push(whale.y);
+    }
+    const swing = Math.max(...heights) - Math.min(...heights);
+    expect(swing).toBeGreaterThan(0.5);
+  });
+});
+
+describe("지나가는 배 — 사라짐", () => {
+  it("항로 끝에서는 이미 다 흐려져 있다", () => {
+    /**
+     * 되돌아가는 순간이 화면 안에 들어와도 깜빡이면 안 된다.
+     * 끝에 닿기 전에 0 이 되어야 **안개에 녹아드는** 것으로 보인다.
+     */
+    for (let t = 0; t < 200; t += 0.25) {
+      for (const boat of boatsAt(t)) {
+        if (Math.abs(boat.x) > LANE_SPAN - 2)
+          expect(boat.fade).toBeLessThan(0.1);
+      }
+    }
+  });
+
+  it("한복판에서는 또렷하다", () => {
+    for (let t = 0; t < 200; t += 0.25) {
+      for (const boat of boatsAt(t)) {
+        if (Math.abs(boat.x) < LANE_SPAN * 0.5) expect(boat.fade).toBe(1);
+      }
+    }
   });
 });

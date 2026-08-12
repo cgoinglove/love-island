@@ -107,7 +107,11 @@ export function shellsToFire(
        * 터지는 그림이 됐다. 하늘의 불꽃이 깃발을 가리면 그건 하늘이 아니라
        * 깃발과 카메라 사이에 낀 무언가다 — 원근이 통째로 어긋나 보인다.
        *
-       * 지금은 배너보다 뒤(64~78m)다. 겹쳐도 깃발이 앞이라 자연스럽게 가려진다.
+       * 지금은 배너보다 뒤(72~84m)다. 겹쳐도 깃발이 앞이라 자연스럽게 가려진다.
+       *
+       * ⚠ 섬을 세 배로 키울 때 이 값은 **중심 거리로 곱하지 않았다.** 보는 사람은
+       *   늘 북쪽 물가에 서 있으므로 중요한 건 **물가에서 얼마나 나갔나** 다.
+       *   예전에도 지금도 물가에서 42~56m 이고, 그래서 의자에서 보는 그림이 똑같다.
        *
        * ⚠ 멀리 보내려면 **터지는 높이도 같이 올려야 한다.** 곡률이 거리 제곱으로
        *   끌어내리기 때문이다(110m 에서 16m). 예전에 46~70m 로 보냈다가 하나도
@@ -125,9 +129,9 @@ export function shellsToFire(
        * 깃발을 가운데 두고 좌우에서 피어오르는 그림이 된다.
        */
       const side = hashUnit(seed + shell, 0x9c17) < 0.5 ? -1 : 1;
-      const bearing = 0.21 + hashUnit(seed + shell, 0x51ed) * 0.52;
+      const bearing = 0.13 + hashUnit(seed + shell, 0x51ed) * 0.17;
       const angle = NORTH + side * bearing;
-      const radius = 64 + hashUnit(seed + shell, 0x2be7) * 14;
+      const radius = 72 + hashUnit(seed + shell, 0x2be7) * 12;
 
       shots.push({
         key: `${day}:${showIndex}:${shell}`,

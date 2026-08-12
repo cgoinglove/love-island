@@ -27,8 +27,8 @@ import {
 const CURVATURE = 0.0013;
 
 /** 밤 불꽃이 터지는 자리(game/world/nightShow). */
-const SHELL_MIN_RADIUS = 64;
-const SHELL_MAX_RADIUS = 78;
+const SHELL_MIN_RADIUS = 72;
+const SHELL_MAX_RADIUS = 84;
 const SHELL_MIN_POWER = 2.1;
 const SHELL_MAX_POWER = 3.0;
 

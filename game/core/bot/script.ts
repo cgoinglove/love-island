@@ -41,7 +41,7 @@ export const BOT_TOPICS: readonly BotTopic[] = [
   { id: "controls" },
   { id: "career", guideTo: [-11.8, 16.6] },
   { id: "album", guideTo: [11.8, 16.6] },
-  { id: "fishing", guideTo: [-3.3, 34.1] },
+  { id: "fishing", guideTo: [-5.6, 48.5] },
   { id: "guestbook", guideTo: [0, 11.5] },
 ];
 

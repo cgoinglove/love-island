@@ -8,9 +8,9 @@ import { skyState } from "./dayNight";
 import { OCEAN_FRAGMENT, OCEAN_VERTEX } from "./shaders";
 
 /** 바다 크기. 곡률이 이 끝을 지평선 아래로 접어 내려서 "끝"이 안 보인다. */
-const OCEAN_SIZE = 420;
+const OCEAN_SIZE = 760;
 // 파도 파장이 ~18m 라 2.8m 간격이면 충분하다. 220 → 150 으로 삼각형 5만 개를 그냥 벌었다.
-const OCEAN_SEGMENTS = 150;
+const OCEAN_SEGMENTS = 190;
 
 export interface OceanProps {
   curvature: number;

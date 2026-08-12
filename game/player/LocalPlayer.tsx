@@ -31,6 +31,7 @@ import {
   isFollowing,
   setPath,
 } from "./pathFollow";
+import { applySitPose, applySwimPose, isSitting, splashInto } from "./poses";
 import { SpeechBubble } from "./SpeechBubble";
 import {
   applyImpulse,
@@ -44,7 +45,7 @@ import {
   type RenderPose,
   stepPlayer,
 } from "./simulation";
-import { applySitPose, isSitting } from "./sitPose";
+import { ISLAND_WATER } from "./water";
 
 const NO_INPUT: Vec2XZ = [0, 0];
 
@@ -125,6 +126,10 @@ export function LocalPlayer({
     virtual: { x: number; z: number; jump: boolean; sprint: boolean };
     /** 밀치기 연타 방지와 팔 휘두르는 모션에 쓴다. */
     lastShoveAt: number;
+    /** 직전 프레임에 물에 있었나. 빠지는 **순간**에만 물보라를 터뜨리려고 기억한다. */
+    wasSwimming: boolean;
+    /** 탈것이 밀어 넣는 자리. null 이면 제 발로 다닌다. */
+    carried: { x: number; z: number; y: number; yaw: number } | null;
   } | null>(null);
   if (simRef.current === null) {
     const [startX, startZ] = spawnPoint();
@@ -136,6 +141,8 @@ export function LocalPlayer({
       intent: { axis: [0, 0], jump: false, sprint: false },
       virtual: { x: 0, z: 0, jump: false, sprint: false },
       lastShoveAt: -9999,
+      wasSwimming: false,
+      carried: null,
     };
   }
   const sim = simRef.current;
@@ -207,6 +214,10 @@ export function LocalPlayer({
       setVirtualSprint(down) {
         sim.virtual.sprint = down;
       },
+      carry(pose) {
+        sim.carried = pose;
+        if (pose) clearPath(follower);
+      },
       place(x, z, yaw) {
         // 두 스텝을 모두 옮긴다. 하나만 고치면 보간이 이전 자리에서 끌고 온다.
         for (const step of [sim.current, sim.previous]) {
@@ -236,6 +247,26 @@ export function LocalPlayer({
     (dt) => {
       copyPlayerState(sim.current, sim.previous);
 
+      /**
+       * 탈것에 타고 있으면 시뮬레이션을 통째로 건너뛴다.
+       *
+       * 중력을 그대로 두고 위치만 덮어쓰면 매 스텝 떨어지려는 속도가 쌓이다가,
+       * 내리는 순간 그 속도가 한꺼번에 터져 사람이 땅으로 꽂힌다.
+       */
+      const carried = sim.carried;
+      if (carried) {
+        sim.current.x = carried.x;
+        sim.current.z = carried.z;
+        sim.current.y = carried.y;
+        sim.current.yaw = carried.yaw;
+        sim.current.vx = 0;
+        sim.current.vz = 0;
+        sim.current.vy = 0;
+        sim.current.grounded = true;
+        sim.current.swimming = false;
+        return;
+      }
+
       const source = inputRef.current;
       const keyboard = source?.axis() ?? NO_INPUT;
       const axisX = keyboard[0] + sim.virtual.x;
@@ -259,7 +290,14 @@ export function LocalPlayer({
       sim.intent.jump = (source?.jump() ?? false) || sim.virtual.jump;
       sim.intent.sprint = (source?.sprint() ?? false) || sim.virtual.sprint;
 
-      stepPlayer(sim.current, sim.intent, dt, configRef.current, navGrid);
+      stepPlayer(
+        sim.current,
+        sim.intent,
+        dt,
+        configRef.current,
+        navGrid,
+        ISLAND_WATER,
+      );
 
       if (follower.arrived) {
         follower.arrived = false;
@@ -271,6 +309,18 @@ export function LocalPlayer({
     (alpha) => {
       const group = groupRef.current;
       if (!group) return;
+
+      /**
+       * 물에 빠지는 순간 한 번 크게 튄다.
+       *
+       * 밀치기가 처음으로 **결과**를 낳는 지점이다 — 그전까지 밀치기는
+       * 상대를 조금 밀어내고 끝이었다. 물보라가 터지고 허우적대는 게 보이면
+       * 그제서야 밀친 쪽도 밀린 쪽도 무슨 일이 일어났는지 안다.
+       */
+      if (sim.current.swimming !== sim.wasSwimming) {
+        sim.wasSwimming = sim.current.swimming;
+        if (sim.current.swimming) splashInto(sim.current.x, sim.current.z);
+      }
 
       interpolatePose(sim.previous, sim.current, alpha, sim.pose);
       // 언덕을 오르내리도록 지형 높이에 붙이고, 점프한 만큼 더 띄운다.
@@ -300,6 +350,8 @@ export function LocalPlayer({
 
         if (isSitting(myId)) {
           applySitPose(body);
+        } else if (sim.current.swimming) {
+          applySwimPose(body, now / 1000);
         } else {
           body.rotation.x = shove - 0.06 * stride;
           body.rotation.z = Math.sin(walkPhase) * 0.055 * stride;

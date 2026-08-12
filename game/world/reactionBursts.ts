@@ -172,6 +172,15 @@ function shellSpeedFor(power: number): number {
  *   따로 조절해야 하는 값이다.
  */
 const STAR_DRAG = 1.7;
+
+/**
+ * 심지와 잔불의 색.
+ *
+ * ⚠ 흰색이 아니라 **살짝 노란 흰색**이다. 순백은 낮 하늘 위에서 배경과 같아져
+ *   가운데가 뚫린 것처럼 보인다 — 흰 심지를 뺐던 것과 같은 이유이고,
+ *   여기서는 아주 짧게만 살기 때문에 살짝 물들이는 것으로 충분하다.
+ */
+const FLASH_CORE = new Color("#fff3c4");
 const STAR_GRAVITY = -3.2;
 
 /**
@@ -293,6 +302,70 @@ function pushBreak(input: BreakInput): void {
       seed: random(),
       floor: 0,
     });
+  }
+
+  /**
+   * **팡.**
+   *
+   * 껍데기만 있으면 원이 소리 없이 피어난다 — 예쁘지만 터지지는 않는다.
+   * 터지는 인상은 두 가지가 만든다:
+   *
+   *  ① **심지** — 터지는 순간 한가운데서 아주 빠르고 아주 짧게 사라지는 흰 불덩이.
+   *     0.3초를 못 넘겨야 "번쩍" 이지, 1초를 살면 그건 그냥 작은 폭죽 하나다.
+   *  ② **잔불** — 원이 다 퍼진 뒤 그 자리에서 자잘하게 튀는 불티. 실제 폭죽의
+   *     "파바박" 이 이것이고, 큰 발일수록 오래 튄다.
+   *
+   * 첫 폭발에만 붙인다. 연쇄마다 넣으면 화면이 흰 점으로 덮이고, 무엇보다
+   * **한 발이 한 번 터진 것**으로 안 읽힌다.
+   */
+  if (input.depth === 0) {
+    const flash = Math.round(90 * power);
+    for (let i = 0; i < flash; i += 1) {
+      const [dx, dy, dz] = onSphere(random);
+      const s = speed * (1.6 + random() * 1.1);
+      particles.push({
+        ox: x,
+        oy: y,
+        oz: z,
+        vx: dx * s,
+        vy: dy * s,
+        vz: dz * s,
+        // 저항을 크게 줘서 확 나갔다 바로 멈춘다 — 그게 "번쩍" 의 모양이다.
+        drag: STAR_DRAG * 3.2,
+        gravity: 0,
+        life: 0.22 + random() * 0.16,
+        delay,
+        size: 0.16 + random() * 0.12,
+        color: FLASH_CORE,
+        shape: 2,
+        seed: random(),
+        floor: 0,
+      });
+    }
+
+    const crackle = Math.round(150 * power);
+    for (let i = 0; i < crackle; i += 1) {
+      const [dx, dy, dz] = onSphere(random);
+      const s = speed * (0.55 + random() * 0.5);
+      particles.push({
+        ox: x,
+        oy: y,
+        oz: z,
+        vx: dx * s,
+        vy: dy * s,
+        vz: dz * s,
+        drag: STAR_DRAG,
+        gravity: STAR_GRAVITY,
+        // 아주 짧게 산다. 태어나는 시각이 제각각이라 자잘하게 터지는 것으로 보인다.
+        life: 0.18 + random() * 0.3,
+        delay: delay + 0.5 + random() * 1.1,
+        size: 0.07 + random() * 0.06,
+        color: i % 3 === 0 ? input.accent : FLASH_CORE,
+        shape: 2,
+        seed: random(),
+        floor: 0,
+      });
+    }
   }
 
   const spread = layer.maxChildren - layer.minChildren + 1;

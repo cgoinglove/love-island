@@ -66,16 +66,20 @@ describe("해안선", () => {
   });
 
   it("shoreDistance 는 안쪽에서 음수, 바깥에서 양수", () => {
+    // 절대 좌표를 박지 않는다 — 섬 크기를 바꿀 때마다 테스트가 같이 거짓말한다.
+    const far = ISLAND_BASE_RADIUS * 1.5;
     expect(shoreDistance(0, 0)).toBeLessThan(0);
-    expect(shoreDistance(60, 0)).toBeGreaterThan(0);
-    expect(shoreDistance(0, -60)).toBeGreaterThan(0);
+    expect(shoreDistance(far, 0)).toBeGreaterThan(0);
+    expect(shoreDistance(0, -far)).toBeGreaterThan(0);
   });
 });
 
 describe("지형 높이", () => {
   it("섬 한가운데는 물 위, 먼 바다는 물 아래", () => {
     expect(elevationAt(0, 0)).toBeGreaterThan(SEA_LEVEL);
-    expect(elevationAt(40, 40)).toBeLessThan(SEA_LEVEL);
+    expect(elevationAt(ISLAND_BASE_RADIUS, ISLAND_BASE_RADIUS)).toBeLessThan(
+      SEA_LEVEL,
+    );
   });
 
   it("해안선을 지나면 반드시 물에 잠긴다", () => {
@@ -104,7 +108,7 @@ describe("지형 높이", () => {
   it("isLandAt 은 섬 중앙과 스폰 지점에서 참", () => {
     expect(isLandAt(0, 0)).toBe(true);
     expect(isLandAt(SPAWN_POINT[0], SPAWN_POINT[1])).toBe(true);
-    expect(isLandAt(50, 0)).toBe(false);
+    expect(isLandAt(ISLAND_BASE_RADIUS * 1.25, 0)).toBe(false);
   });
 });
 
@@ -131,10 +135,13 @@ describe("해변 가구", () => {
 
   it("야자수가 서로 멀찍이 떨어져 있다", () => {
     // 한쪽에 몰리면 반대쪽이 텅 비어 "가 볼 데가 없는 섬"이 된다.
+    // 기준은 섬 크기에 비례한다 — 반지름이 줄면 같은 간격도 상대적으로는 넓다.
     const palms = FURNITURE.filter((item) => item.kind === "palm");
     for (const [i, a] of palms.entries()) {
       for (const b of palms.slice(i + 1)) {
-        expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(12);
+        expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(
+          ISLAND_BASE_RADIUS * 0.17,
+        );
       }
     }
   });

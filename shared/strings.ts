@@ -28,8 +28,8 @@ const ko = {
       { key: "탭", action: "그 자리로 걸어가기" },
       { key: "WASD", action: "직접 이동" },
       { key: "Shift", action: "달리기" },
-      { key: "Space", action: "점프" },
-      { key: "F", action: "밀치기" },
+      { key: "Space", action: "점프 · 물에 뛰어들기" },
+      { key: "F", action: "밀치기 — 물가에서는 빠뜨릴 수 있다" },
       { key: "E", action: "가까운 것과 상호작용" },
       { key: "Enter", action: "말 걸기" },
       { key: "1 2 3", action: "하트 · 폭죽 · 축포" },
@@ -200,6 +200,20 @@ const ko = {
     },
   },
 
+  balloon: {
+    label: "열기구 타기",
+    departing: (seconds: number) => `${seconds}초 뒤 출발`,
+    landing: (seconds: number) => `${seconds}초 뒤 착륙`,
+    jump: "뛰어내리기 (Esc)",
+  },
+
+  fireworks: {
+    label: "폭죽 쏘기",
+    hint: "누르고 있는 만큼 크게 터집니다",
+    charge: "꾹 눌러 쏘기",
+    quit: "그만",
+  },
+
   sunset: {
     label: "앉기",
     caption: "가만히 보세요. 밤이 오면 폭죽이 터집니다.",
@@ -227,8 +241,8 @@ const en: Dict = {
       { key: "Tap", action: "Walk there" },
       { key: "WASD", action: "Move" },
       { key: "Shift", action: "Run" },
-      { key: "Space", action: "Jump" },
-      { key: "F", action: "Shove" },
+      { key: "Space", action: "Jump · dive in" },
+      { key: "F", action: "Shove — push them in at the shore" },
       { key: "E", action: "Interact with what's nearby" },
       { key: "Enter", action: "Say hi" },
       { key: "1 2 3", action: "Heart · Firework · Confetti" },
@@ -391,6 +405,20 @@ const en: Dict = {
         ],
       },
     },
+  },
+
+  balloon: {
+    label: "Ride the balloon",
+    departing: (seconds: number) => `Lifting off in ${seconds}s`,
+    landing: (seconds: number) => `Landing in ${seconds}s`,
+    jump: "Jump out (Esc)",
+  },
+
+  fireworks: {
+    label: "Launch fireworks",
+    hint: "Hold longer, burst bigger",
+    charge: "Hold to launch",
+    quit: "Done",
   },
 
   sunset: {

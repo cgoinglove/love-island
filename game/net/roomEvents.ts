@@ -5,6 +5,7 @@ import {
   botDecision,
   CHAT_BUBBLE_MS,
   isReactionKind,
+  parseShell,
   type ReactionKind,
   type RoomEvent,
 } from "@/shared/presence";
@@ -88,6 +89,8 @@ export interface ReactionBurst {
   kind: ReactionKind;
   x: number;
   z: number;
+  /** 규모 배수. 사람이 직접 쏜 폭죽만 1 이 아니다. */
+  power?: number;
 }
 
 type ReactionHandler = (burst: ReactionBurst) => void;
@@ -146,6 +149,34 @@ export function registerActivityHandler(handler: ActivityHandler): () => void {
   };
 }
 
+/**
+ * 열기구 출발 알림. 활동 상태와 같은 이유로 여기서 처리하지 않고 넘기기만 한다 —
+ * 컨텐츠(features/balloon)가 듣는다.
+ */
+type RideHandler = (event: RoomEvent) => void;
+const rideHandlers = new Set<RideHandler>();
+
+export function registerRideHandler(handler: RideHandler): () => void {
+  rideHandlers.add(handler);
+  return () => {
+    rideHandlers.delete(handler);
+  };
+}
+
+/**
+ * 비치볼 발길질. 활동 상태와 같은 이유로 여기서 처리하지 않고 넘기기만 한다 —
+ * 컨텐츠(features/beachball)가 듣는다.
+ */
+type BallHandler = (event: RoomEvent) => void;
+const ballHandlers = new Set<BallHandler>();
+
+export function registerBallHandler(handler: BallHandler): () => void {
+  ballHandlers.add(handler);
+  return () => {
+    ballHandlers.delete(handler);
+  };
+}
+
 export function registerShoveHandler(handler: ShoveHandler): () => void {
   shoveHandlers.add(handler);
   return () => {
@@ -185,6 +216,23 @@ export function handleRoomEvent(event: RoomEvent, myId: string): void {
 
   if (event.kind === "act") {
     for (const handler of activityHandlers) handler(event);
+    return;
+  }
+
+  if (event.kind === "ride") {
+    for (const handler of rideHandlers) handler(event);
+    return;
+  }
+
+  if (event.kind === "ball") {
+    for (const handler of ballHandlers) handler(event);
+    return;
+  }
+
+  if (event.kind === "shell") {
+    // 터질 자리는 사건에 실려 온다 — 쏜 사람 자리가 아니라 바다 멀리다.
+    const shot = parseShell(event.text, { power: 1, x: event.x, z: event.z });
+    fireReaction({ kind: "firework", ...shot });
     return;
   }
 
@@ -229,6 +277,12 @@ export function reflectOwnEvent(
       kind: event.kind,
       at: Date.now(),
     });
+    return;
+  }
+
+  if (event.kind === "shell") {
+    const shot = parseShell(event.text, { power: 1, x: event.x, z: event.z });
+    fireReaction({ kind: "firework", ...shot });
     return;
   }
 

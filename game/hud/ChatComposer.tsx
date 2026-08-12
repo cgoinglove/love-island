@@ -3,7 +3,6 @@
 import { MessageCircle, SendHorizontal } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CHUNKY, SIGN, SIGN_ACCENT } from "@/components/island/ui";
-import { useAmSitting } from "@/game/net/activity";
 import { emitRoomEvent } from "@/game/net/presence";
 import { CHAT_MAX } from "@/shared/constants";
 import { REACTION_COOLDOWN_MS, type ReactionKind } from "@/shared/presence";
@@ -61,7 +60,7 @@ export function ChatComposer() {
    * 앉아 있으면 아래 검은 띠(11vh) 위로 올라앉는다.
    * 띠 뒤에 반쯤 잠긴 입력창은 안 보이는 것과 같다.
    */
-  const sitting = useAmSitting();
+  const sitting = useHudStore((state) => state.immersive);
   const dockBottom = sitting
     ? "bottom-[13vh]"
     : "bottom-[max(1.5rem,env(safe-area-inset-bottom))]";

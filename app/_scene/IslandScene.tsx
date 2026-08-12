@@ -1,7 +1,10 @@
 "use client";
 
 import { AlbumPanel, Easel } from "@/features/album";
+import { Balloon, Islet, RideHud } from "@/features/balloon";
+import { BeachBall } from "@/features/beachball";
 import { CareerPanel, Desk } from "@/features/career";
+import { Launcher, LauncherHud } from "@/features/fireworks";
 import { FishingHud, FishingSpot, Tackle } from "@/features/fishing";
 import { Board, GuestbookNotes, GuestbookPanel } from "@/features/guestbook";
 import { Chairs, SeatHud } from "@/features/sunset";
@@ -30,6 +33,8 @@ export function IslandScene({ onReady }: { onReady: () => void }) {
 
           <AlbumPanel />
           <FishingHud />
+          <LauncherHud />
+          <RideHud />
           <SeatHud />
         </>
       }
@@ -40,6 +45,10 @@ export function IslandScene({ onReady }: { onReady: () => void }) {
       <FishingSpot />
       <Tackle />
       <Chairs />
+      <Balloon />
+      <Islet />
+      <BeachBall />
+      <Launcher />
       <Easel />
     </GameCanvas>
   );

@@ -138,21 +138,3 @@ export function useActivityFeed(): void {
     };
   }, []);
 }
-
-/** 이 사람이 지금 하고 있는 일. 아무것도 안 하면 null. */
-export function useDoing(playerId: string): ActivityKind | null {
-  return useActivityStore((state) => state.doing[playerId]?.kind ?? null);
-}
-
-/**
- * 내가 지금 앉아 있는가.
- *
- * HUD 가 이걸 물어보는 이유는, 앉으면 화면이 **조작하는 화면에서 보는 화면**으로
- * 바뀌기 때문이다. 조이스틱과 버튼이 검은 띠 뒤에 반쯤 걸쳐 남아 있으면
- * 그 전환이 흐려진다. 앉기는 features 의 기능이지만 이 사실은 이미 네트워크를
- * 타고 다니므로, HUD 가 컨텐츠를 몰라도 물어볼 수 있다.
- */
-export function useAmSitting(): boolean {
-  const me = getMyPlayerId();
-  return useActivityStore((state) => state.doing[me]?.kind === "sitting");
-}

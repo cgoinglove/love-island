@@ -14,7 +14,16 @@
 export const POSE_BYTES = 8;
 
 /** 섬이 반지름 17m 라 ±32m 면 넉넉하다. 이 범위를 넘는 값은 잘린다. */
-const POSITION_RANGE = 32;
+/**
+ * 실어 나를 수 있는 좌표(±m).
+ *
+ * ⚠ shared/presence 의 x·z 상한과 **같은 숫자**여야 한다. 32 였을 땐 섬이
+ *   반지름 40 이라 이미 아슬아슬했고, 세 배로 키운 뒤에는 섬 절반이 통째로
+ *   범위 밖이 된다 — P2P 로만 위치가 잘려서 **남의 화면에서만 그 사람이
+ *   섬 가장자리에 붙어 있는** 그림이 나온다.
+ *   정밀도는 120/32767 = 4mm 라 넓혀도 잃는 게 없다.
+ */
+const POSITION_RANGE = 120;
 const POSITION_SCALE = 32767 / POSITION_RANGE;
 const YAW_SCALE = 32767 / Math.PI;
 
@@ -28,7 +37,15 @@ const YAW_SCALE = 32767 / Math.PI;
  *
  * 점프 정점이 1.8m, 넉백 정점이 0.6m 다. 8m 면 넉넉하고 정밀도는 0.25mm 다.
  */
-const HEIGHT_RANGE = 8;
+/**
+ * 실어 나를 수 있는 높이(±m).
+ *
+ * ⚠ shared/presence 의 presenceBeat.y 상한과 **같은 숫자**여야 한다. 8 이었을 땐
+ *   열기구(26m)를 탄 사람이 P2P 로는 8m 에서 잘리고 폴백으로는 제 높이로 와서,
+ *   보는 사람마다 다른 높이에 떠 있었다.
+ *   정밀도는 40/32767 = 1.2mm 라 넓혀도 잃는 게 없다.
+ */
+const HEIGHT_RANGE = 40;
 const HEIGHT_SCALE = 32767 / HEIGHT_RANGE;
 
 /**

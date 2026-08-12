@@ -8,6 +8,8 @@ import { CHUNKY } from "@/components/island/ui";
 import { type Interactable, useInteractables } from "@/game/core/interactable";
 import { elevationAt } from "@/game/core/island";
 import { usePlayerController } from "@/game/core/playerControl";
+import { curvatureUniforms } from "@/game/world/curvature";
+import { useHudStore } from "./store";
 
 /**
  * 상호작용 오브젝트 위에 떠 있는 이름표.
@@ -21,6 +23,13 @@ import { usePlayerController } from "@/game/core/playerControl";
  */
 export function InteractableLabels() {
   const items = useInteractables();
+  /**
+   * 앉아 있거나 하늘에 떠 있는 동안엔 이름표를 통째로 접는다.
+   * 갈 수 없는 곳의 이름표는 안내가 아니라 방해다 — 열기구에서 내려다보면
+   * 발밑을 지나는 이름표가 죄다 화면에 뜬다.
+   */
+  const immersive = useHudStore((state) => state.immersive);
+  if (immersive) return null;
 
   return (
     <>
@@ -74,8 +83,23 @@ function Label({ item }: { item: Interactable }) {
 
     // id 로 위상을 어긋내야 여러 이름표가 한 몸처럼 같이 움직이지 않는다.
     const phase = item.id.length * 0.7;
+
+    /**
+     * ⚠ 이름표에도 **손으로** 곡률을 먹인다.
+     *
+     * 세계는 셰이더가 휘어 내리는데(CURVED_VERTEX) 이름표는 3D 오브젝트가 아니라
+     * 화면에 얹힌 DOM 이라 그 셰이더를 안 탄다. 섬이 반지름 40 이던 시절엔 낙차가
+     * 2m 라 그럭저럭 붙어 있었지만, 세 배로 키운 뒤에는 100m 떨어진 이름표가
+     * **13m 위 허공에 떠서** 무엇의 이름표인지 알 수 없게 된다.
+     * 낚싯줄이 같은 이유로 같은 식을 쓴다(features/fishing/Tackle).
+     */
+    const camera = state.camera.position;
+    const distance = Math.hypot(camera.x - x, camera.z - z);
+    const drop = distance * distance * curvatureUniforms.uCurvature.value;
+
     group.position.y =
-      baseY +
+      baseY -
+      drop +
       Math.sin(state.clock.elapsedTime * BOB_SPEED + phase) * BOB_AMPLITUDE;
   });
 

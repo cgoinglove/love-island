@@ -94,16 +94,29 @@ describe("불꽃놀이 연출", () => {
         const angle = Math.atan2(shot.at[1], shot.at[0]);
         const radius = Math.hypot(shot.at[0], shot.at[1]);
 
-        // 어느 방향으로 쏘든 해안선 한참 바깥 = 물 위.
+        /**
+         * 어느 방향으로 쏘든 해안선 한참 바깥 = 물 위.
+         *
+         * ⚠ 절대 반지름이 아니라 **해안선에서 얼마나 나갔나**로 잰다.
+         *   섬 크기를 바꾸면 절대값은 통째로 거짓말이 되는데, 정작 지켜야 하는
+         *   성질(물 위에서 터진다)은 해안선과의 관계다.
+         */
         expect(radius - shoreRadiusAt(angle)).toBeGreaterThan(20);
         expect(radius).toBeGreaterThan(bannerDistance + 4);
-        // 무한정 멀어져도 안 된다 — 곡률이 거리 제곱으로 끌어내린다.
-        expect(radius).toBeLessThan(95);
+        /**
+         * 무한정 멀어져도 안 된다 — 곡률이 거리 제곱으로 끌어내린다.
+         * 보는 자리는 북쪽 물가(노을 의자)이므로 거기서의 거리로 잰다.
+         */
+        expect(radius - shoreRadiusAt(angle)).toBeLessThan(65);
 
+        /**
+         * 정북 한가운데는 배너 자리라 비워두고, 너무 벌어져도 안 된다 —
+         * 섬이 세 배가 되면서 하트의 북쪽 봉우리가 옆 방위까지 자라나
+         * 거기서 쏘면 육지 위다.
+         */
         const bearing = Math.atan2(shot.at[0], -shot.at[1]);
-        expect(Math.abs(bearing)).toBeLessThan(0.75);
-        // 정북 한가운데는 배너 자리라 비워둔다.
-        expect(Math.abs(bearing)).toBeGreaterThan(0.2);
+        expect(Math.abs(bearing)).toBeLessThan(0.32);
+        expect(Math.abs(bearing)).toBeGreaterThan(0.12);
       }
     }
   });

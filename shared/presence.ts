@@ -16,8 +16,20 @@ export const presenceBeat = z.object({
   playerId: z.string().min(8).max(64),
   room: z.string().min(1).max(32),
   nickname: z.string().trim().max(NICKNAME_MAX).nullable(),
-  x: z.number().finite().min(-45).max(45),
-  z: z.number().finite().min(-45).max(45),
+  /**
+   * 섬 좌표.
+   *
+   * ⚠ 상한은 섬 크기가 아니라 **사람이 갈 수 있는 가장 먼 곳**을 따라간다.
+   *   걸어서는 해안선(57m)에 헤엄 4m 가 한계지만, 열기구를 타면 앞바다의
+   *   작은 섬까지 갔다 오므로 그보다 훨씬 멀리 나간다. 좁게 잡아 두면
+   *   **남의 화면에서만 기구가 중간에서 멈춘다** — 높이 상한에서 이미 한 번
+   *   겪은 실수다(y 가 8m 에서 잘려 탄 사람이 지붕에 서 있었다).
+   *
+   *   game/net/poseCodec 의 POSITION_RANGE 도 같은 숫자여야 한다 —
+   *   한쪽만 고치면 P2P 와 폴백에서 좌표가 달라진다.
+   */
+  x: z.number().finite().min(-120).max(120),
+  z: z.number().finite().min(-120).max(120),
   /** 라디안. 서버는 범위만 보고 값을 해석하지 않는다. */
   yaw: z.number().finite().min(-10).max(10),
   /**
@@ -26,8 +38,13 @@ export const presenceBeat = z.object({
    * 이게 없어서 남의 점프와 넉백이 안 보였다 — 받는 쪽이 좌표의 지면 높이에
    * 캐릭터를 붙여놓기 때문에 상대는 땅에 붙어 미끄러졌다.
    * 예전 클라이언트가 안 보낼 수도 있으니 기본값을 둔다.
+   *
+   * ⚠ 상한이 20 이었을 땐 **열기구를 탄 사람이 남의 화면에서만 낮게 떠 있었다.**
+   *   점프 높이(2m)만 생각하고 잡은 값이라, 하늘로 올라가는 탈것이 생기자마자
+   *   모자랐다. game/net/poseCodec 의 HEIGHT_RANGE 도 같은 숫자여야 한다 —
+   *   한쪽만 고치면 P2P 와 폴백에서 높이가 달라진다.
    */
-  y: z.number().finite().min(0).max(20).default(0),
+  y: z.number().finite().min(0).max(40).default(0),
 });
 
 export type PresenceBeat = z.infer<typeof presenceBeat>;
@@ -84,6 +101,30 @@ export const roomEventKind = z.enum([
   "botAsk",
   /** 지금 뭘 하고 있는지(낚시 · 앉기). 아래 ACTIVITY_KINDS 참고. */
   "act",
+  /**
+   * 비치볼을 찼다. text 에 **공의 상태 전체**(자리 + 속도)가 실린다.
+   *
+   * 자리만 보내면 받는 쪽이 그 다음을 이어 굴릴 수 없다. 속도까지 함께
+   * 보내야 각자 같은 계산을 돌려 같은 자리에 놓을 수 있고, 그러면 다음
+   * 발길질까지 통신이 0 이다 — 초당 60번 좌표를 뿌리는 대신 낸 값이다.
+   */
+  "ball",
+  /**
+   * 사람이 직접 쏘아 올린 폭죽. text 에 **규모**가 실린다.
+   *
+   * fx 로 안 보내는 이유: fx 의 text 는 종류(ReactionKind)를 나르는 자리라
+   * 거기에 숫자를 겹쳐 실으면 두 뜻이 한 칸을 쓰게 된다. 규모가 있는 폭죽은
+   * 규모가 없는 감정표현과 다른 사건이다.
+   */
+  "shell",
+  /**
+   * 열기구 출발 알림. text 에 **출발 시각**(공유 시계 epoch ms)이 실린다.
+   *
+   * 기구의 자리는 그 시각 하나에서 전부 유도된다(features/balloon/flight).
+   * 그래서 같이 타는 데 오가는 건 이 숫자 하나뿐이다 — 좌표도, 고도도,
+   * 누가 탔는지도 보내지 않는다.
+   */
+  "ride",
 ]);
 export type RoomEventKind = z.infer<typeof roomEventKind>;
 
@@ -132,6 +173,95 @@ export function isReactionKind(value: string): value is ReactionKind {
   return (REACTION_KINDS as readonly string[]).includes(value);
 }
 
+/** 사람이 쏘는 폭죽의 규모 범위. 이 밖의 값은 믿지 않는다. */
+export const SHELL_MIN_POWER = 1;
+export const SHELL_MAX_POWER = 3;
+
+/** 사람이 쏜 폭죽 한 발. 규모와 **터질 자리**를 함께 나른다. */
+export interface ShellShot {
+  power: number;
+  x: number;
+  z: number;
+}
+
+/**
+ * 남이 보낸 폭죽 문자열("규모,x,z")을 안전한 값으로 바꾼다.
+ *
+ * ── 왜 자리까지 싣나 ──
+ * 예전엔 규모만 보내고 **보낸 사람 자리**에서 터뜨렸다. 그러면 발사대 바로 위,
+ * 즉 머리 위에서 터진다 — 폭죽은 멀리서 터져야 폭죽이고, 눈앞에서 터지면
+ * 그냥 화면을 덮는 입자다. 지금은 발사대가 바다 쪽으로 겨냥한 자리를 실어 보낸다.
+ *
+ * 남이 보낸 값은 믿지 않는다 — 규모 999 짜리 폭죽 하나면 파티클 링버퍼가
+ * 통째로 덮여 다른 사람들의 연출이 전부 지워지고, 좌표가 범위를 벗어나면
+ * 아무도 못 보는 자리에서 터진다.
+ */
+export function parseShell(text: string, fallback: ShellShot): ShellShot {
+  const [rawPower, rawX, rawZ] = text.split(",");
+  const power = Number.parseFloat(rawPower ?? "");
+  const x = Number.parseFloat(rawX ?? "");
+  const z = Number.parseFloat(rawZ ?? "");
+  const clamp = (value: number, limit: number, spare: number) =>
+    Number.isFinite(value) ? Math.min(limit, Math.max(-limit, value)) : spare;
+  return {
+    power: Number.isFinite(power)
+      ? Math.min(SHELL_MAX_POWER, Math.max(SHELL_MIN_POWER, power))
+      : SHELL_MIN_POWER,
+    x: clamp(x, 120, fallback.x),
+    z: clamp(z, 120, fallback.z),
+  };
+}
+
+/**
+ * 열기구 출발 시각을 읽는다. 못 믿을 값이면 null.
+ *
+ * 남이 보낸 값은 믿지 않는다 — 먼 미래를 보내면 기구가 영영 안 뜨고,
+ * 먼 과거를 보내면 매 프레임 착륙 판정이 돈다. 한 편의 길이 안팎만 받는다.
+ */
+/**
+ * 찬 공의 상태. "x,y,z,vx,vy,vz" 여섯 개다.
+ *
+ * 남이 보낸 숫자는 믿지 않는다 — 자리는 섬 밖으로 못 나가게 자르고,
+ * 속도는 사람이 낼 수 있는 범위로 자른다. 하나라도 숫자가 아니면 통째로 버린다.
+ */
+export function parseBall(text: string): {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+} | null {
+  const parts = text.split(",").map((raw) => Number.parseFloat(raw));
+  if (parts.length !== 6 || parts.some((v) => !Number.isFinite(v))) return null;
+
+  const clamp = (value: number, limit: number) =>
+    Math.min(limit, Math.max(-limit, value));
+  const [x, y, z, vx, vy, vz] = parts as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ];
+  return {
+    x: clamp(x, 70),
+    y: Math.min(30, Math.max(0, y)),
+    z: clamp(z, 70),
+    vx: clamp(vx, 22),
+    vy: clamp(vy, 22),
+    vz: clamp(vz, 22),
+  };
+}
+
+export function parseDepartAt(text: string, now: number): number | null {
+  const at = Number.parseFloat(text);
+  if (!Number.isFinite(at)) return null;
+  const ahead = at - now;
+  return ahead < 30_000 && ahead > -120_000 ? at : null;
+}
+
 /**
  * 사건 하나가 실어 나를 수 있는 최대 글자 수.
  * 봇 결정 JSON 이 들어갈 만큼만 잡는다 — 넉넉하게 잡으면 DB 행이 그만큼 무거워진다.
@@ -152,8 +282,8 @@ const roomEventShape = {
    */
   text: z.string().max(EVENT_TEXT_MAX),
   /** 사건이 일어난 자리. shove 는 여기서부터 반경 안의 사람을 민다. */
-  x: z.number().finite().min(-45).max(45),
-  z: z.number().finite().min(-45).max(45),
+  x: z.number().finite().min(-120).max(120),
+  z: z.number().finite().min(-120).max(120),
   yaw: z.number().finite().min(-10).max(10),
 };
 
@@ -299,10 +429,10 @@ export const REACTION_COOLDOWN_MS = 80;
  */
 export const botDecision = z.object({
   id: z.string().min(4).max(64),
-  tx: z.number().finite().min(-45).max(45),
-  tz: z.number().finite().min(-45).max(45),
-  fx: z.number().finite().min(-45).max(45),
-  fz: z.number().finite().min(-45).max(45),
+  tx: z.number().finite().min(-120).max(120),
+  tz: z.number().finite().min(-120).max(120),
+  fx: z.number().finite().min(-120).max(120),
+  fz: z.number().finite().min(-120).max(120),
   /** 서버 보정 epoch ms. 위치를 여기서 역산한다. */
   at: z.number().finite(),
   /**

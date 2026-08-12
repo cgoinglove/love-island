@@ -101,7 +101,8 @@ describe("buildBurst", () => {
     // 감정표현은 보낸 사람 자리에서 터져야 한다. 원점에서 터지면 누가 보냈는지 모른다.
     // 폭죽만 예외로 비스듬히 올라가므로 몇 미터 옆에서 터진다.
     for (const kind of REACTION_KINDS) {
-      const slack = kind === "firework" ? 6 : 1.5;
+      // 폭죽만 비스듬히 올라가므로 몇 미터 옆에서 터진다.
+      const slack = kind === "firework" ? 7 : 1.5;
       for (const p of all(kind)) {
         expect(Math.abs(p.ox - 3), kind).toBeLessThan(slack);
         expect(Math.abs(p.oz + 7), kind).toBeLessThan(slack);
@@ -207,8 +208,13 @@ describe("buildBurst", () => {
     const burstY = fireworkBurstHeight(2.5);
     // 1차 폭발의 바깥 껍데기만 본다.
     // 연쇄와 안쪽 층은 일부러 느리고, 섬광 덩어리는 아예 안 움직인다(크기로 걸러낸다).
+    /**
+     * ⚠ **수명으로** 껍데기를 고른다. 같은 자리 같은 시각에 태어나는 게
+     *   껍데기만이 아니기 때문이다 — 터지는 순간의 심지와 잔불도 거기서 난다.
+     *   그것들은 0.5초를 못 넘게 살고, 껍데기는 4초 가까이 산다.
+     */
     const shell = particles.filter(
-      (p) => p.delay === 0.55 && p.oy === burstY && p.size < 1,
+      (p) => p.delay === 0.55 && p.oy === burstY && p.life > 3,
     );
     expect(shell.length).toBeGreaterThan(100);
 
@@ -223,8 +229,11 @@ describe("buildBurst", () => {
     const particles = buildBurst("firework", 0, 0, seeded(17), 2.5);
     const burstY = fireworkBurstHeight(2.5);
 
-    // 1차보다 늦게, 1차가 아닌 자리에서 태어나는 입자가 있어야 연쇄다.
-    const secondary = particles.filter((p) => p.delay > 0.7);
+    /**
+     * 1차보다 늦게, 1차가 아닌 자리에서 태어나는 입자가 있어야 연쇄다.
+     * 잔불도 늦게 태어나지만 **1차와 같은 자리**에서 나므로 수명으로 걸러낸다.
+     */
+    const secondary = particles.filter((p) => p.delay > 0.7 && p.life > 3);
     expect(secondary.length).toBeGreaterThan(50);
     const origins = new Set(
       secondary.map((p) => `${p.ox.toFixed(2)},${p.oy.toFixed(2)}`),
@@ -312,7 +321,8 @@ describe("buildBurst", () => {
      * 별이 흐려졌다. 수명이 시간상수(1/k)의 네 배는 돼야 둘 다 성립한다.
      */
     const particles = buildBurst("firework", 0, 0, seeded(23), 2.5);
-    const shell = particles.filter((p) => p.delay === 0.55 && p.size < 1);
+    // 껍데기만. 심지와 잔불은 일부러 짧게 산다(0.5초 미만).
+    const shell = particles.filter((p) => p.delay === 0.55 && p.life > 3);
     expect(shell.length).toBeGreaterThan(100);
     for (const star of shell) {
       expect(star.life).toBeGreaterThan((1 / star.drag) * 4);

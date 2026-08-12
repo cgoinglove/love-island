@@ -16,9 +16,9 @@ export const FISHING_PANEL_ID = "fishing.spot";
  *   그 옆면에 서면 위치는 남쪽이면서 던지는 방향은 옆이라, 찌가 화면 안에 남는다.
  *   (해안 법선 약 140° → 화면 중앙에서 가로 23°, 아래 33°. 화각은 가로 ±33°, 아래 3~43°)
  */
-export const FISHING_POSITION: Vec2XZ = [-5.8, 36.1];
+export const FISHING_POSITION: Vec2XZ = [-8.1, 50.5];
 /** 다가가 서는 자리. 낚시터 뒤(섬 안쪽)에 서서 바다를 본다. */
-export const FISHING_APPROACH: Vec2XZ = [-3.3, 34.1];
+export const FISHING_APPROACH: Vec2XZ = [-5.6, 48.5];
 
 /**
  * 던지는 방향. **거의 정서향**(195°)이다.

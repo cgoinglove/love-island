@@ -42,6 +42,20 @@ export interface PlayerController {
    * 속도도 같이 지운다. 안 그러면 놓자마자 관성으로 미끄러져 나간다.
    */
   place(x: number, z: number, yaw: number): void;
+
+  /**
+   * 탈것에 태운다. null 이면 내려놓는다.
+   *
+   * ── 왜 좌표를 매 프레임 밀어 넣나 ──
+   * 태우는 동안 이 캐릭터의 위치는 **시뮬레이션이 정하지 않는다.** 중력도 입력도
+   * 무시하고 탈것을 그대로 따라가야 한다. 그런데 그렇게 옮겨둔 좌표가 그대로
+   * 네트워크로 나가므로(pose 를 읽는 곳이 하나다), 남의 화면에서도 저절로
+   * 하늘에 떠 있게 된다 — 탈것 전용 통신이 한 줄도 필요 없다.
+   *
+   * y 는 **지면 기준 높이**다. 탈것은 절대 고도를 알고 있으므로 지형 높이를
+   * 빼서 넘겨야 한다 — 렌더링이 지형 높이를 다시 더하기 때문이다.
+   */
+  carry(pose: { x: number; z: number; y: number; yaw: number } | null): void;
 }
 
 export interface PlayerPose {

@@ -6,7 +6,15 @@ import { getInteractable } from "@/game/core/interactable";
 import { useHudStore } from "./store";
 import { useTouchMode } from "./touch";
 
-const INTERACT_KEYS = new Set(["KeyE", "Space", "Enter"]);
+/**
+ * 만지는 키.
+ *
+ * ⚠ 한때 Space 도 여기 있었다. 그런데 Space 는 **점프**다 — 의자나 낚시터 옆에서
+ *   뛰려고 누르면 그 자리에 앉아버렸다. 물에 뛰어들 수 있게 되고 나서야 그게
+ *   얼마나 자주 걸리는지 드러났다. 한 키가 두 가지 뜻을 가지면 언젠가 반드시
+ *   원하지 않은 쪽이 나온다.
+ */
+const INTERACT_KEYS = new Set(["KeyE", "Enter"]);
 
 /**
  * 가까이 갔을 때 뜨는 프롬프트.

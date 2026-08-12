@@ -25,13 +25,13 @@ import { SHALLOW_SAND } from "@/game/world/Terrain";
 const FLOOR_Y = -2.6;
 
 /** 바다 판(420)보다 넉넉히 크게. 수평선 너머까지 바닥이 있어야 틈이 안 생긴다. */
-const SIZE = 520;
+const SIZE = 900;
 
 /**
  * 곡률은 정점에서만 계산되므로 면이 크면 사이가 직선으로 잘린다.
  * 세그먼트를 충분히 줘야 바다와 같은 곡선으로 휘어 내려간다.
  */
-const SEGMENTS = 64;
+const SEGMENTS = 96;
 
 export function Seafloor() {
   const geometry = useMemo(() => {

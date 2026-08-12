@@ -13,8 +13,14 @@ import {
 } from "@/shared/presence";
 import { CHARACTER_HEIGHT, CharacterModel } from "./CharacterModel";
 import { ContactShadow } from "./ContactShadow";
+import {
+  applySitPose,
+  applySwimPose,
+  isInWater,
+  isSitting,
+  splashInto,
+} from "./poses";
 import { SpeechBubble } from "./SpeechBubble";
-import { applySitPose, isSitting } from "./sitPose";
 
 /**
  * 지금 섬에 있는 다른 사람들.
@@ -54,6 +60,8 @@ function RemotePlayer({
 }) {
   const groupRef = useRef<Group>(null);
   const bodyRef = useRef<Group>(null);
+  /** 직전 프레임에 물에 있었나. 남이 빠지는 **순간**에도 물보라가 터져야 한다. */
+  const wasSwimming = useRef(false);
   const poseRef = useRef<Pose>({ x: 0, z: 0, yaw: 0, y: 0 });
   const bubble = useRoomEventStore((state) => state.bubbles[playerId]);
 
@@ -92,12 +100,27 @@ function RemotePlayer({
      * 따로 오기 때문에(game/net/activity) 이 한 줄이면 남의 앉음도 보인다.
      */
     const body = bodyRef.current;
+    const swimming = isInWater(pose.x, pose.z);
     if (body) {
       if (isSitting(playerId)) applySitPose(body);
+      else if (swimming) applySwimPose(body, performance.now() / 1000);
       else {
         body.position.y = 0;
         body.rotation.x = 0;
+        body.rotation.z = 0;
       }
+    }
+
+    /**
+     * 남이 물에 빠지는 순간에도 첨벙 터진다.
+     *
+     * 사건으로 보내지 않는다 — 좌표만 있으면 각자 판정할 수 있고, 밀친 쪽과
+     * 밀린 쪽 화면이 어긋날 여지도 없다. 보간 지연만큼 조금 늦게 터지는데,
+     * 그건 어차피 그 사람의 몸도 같은 지연으로 움직이므로 같이 늦는다.
+     */
+    if (swimming !== wasSwimming.current) {
+      wasSwimming.current = swimming;
+      if (swimming) splashInto(pose.x, pose.z);
     }
   });
 

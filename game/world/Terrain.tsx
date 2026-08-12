@@ -15,8 +15,17 @@ import { elevationAt, GRASS_LEVEL } from "@/game/core/island";
 import { ISLAND_GRID } from "@/shared/constants";
 import { CURVED_VERTEX } from "./shaders";
 
-/** 지형 해상도. 80m 를 224 칸으로 나누면 칸당 0.36m — 언덕이 각져 보이지 않는다. */
-const SEGMENTS = 224;
+/**
+ * 지형 해상도. 136m 를 200 칸으로 나누면 칸당 0.7m.
+ *
+ * 언덕은 파장이 24m 라 이보다 훨씬 성겨도 되지만, **물가의 경사**가 3.4m 안에서
+ * 끝나므로 거기가 기준이다 — 칸이 1.5m 를 넘으면 해안선이 톱니처럼 각지고,
+ * 물거품이 그 선을 따라 그려지므로 톱니가 그대로 드러난다.
+ *
+ * ⚠ 섬을 세 배로 키우면서 한 번 384 까지 올렸다가 되돌렸다. 정점 15만 개는
+ *   메시 하나여도 폰에서 부담이고, 0.7m 와 0.9m 는 화면에서 구분이 안 된다.
+ */
+const SEGMENTS = 200;
 
 /**
  * 모래 · 잔디 팔레트.

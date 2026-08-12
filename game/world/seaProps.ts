@@ -4,11 +4,12 @@ import {
   ConeGeometry,
   CylinderGeometry,
   ExtrudeGeometry,
+  LatheGeometry,
   Shape,
   ShapeGeometry,
   SphereGeometry,
   TorusGeometry,
-  type Vector2,
+  Vector2,
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { mergeColored, type Piece } from "@/game/world/meshKit";
@@ -623,64 +624,392 @@ export function buildSchool(): BufferGeometry {
   return merged;
 }
 
-// ── 저 멀리 섬 ──────────────────────────────────────
+// ── 꽃게 ────────────────────────────────────────────
 
 /**
- * 수평선 위의 섬.
+ * 꽃게 한 마리. 앞이 -Z, 폭 0.6m 남짓.
  *
- * ── 왜 이렇게 크고 멀리 있나 ──
- * 곡률이 거리 제곱으로 세계를 접어 내린다(0.0013). 170m 밖이면 **바다가 이미
- * 38m 아래로 내려가 있다** — 그래서 저 멀리 섬은 그만큼 높지 않으면 아예 안 보인다.
- * 실제 바다에서 먼 섬이 봉우리만 보이는 것과 같은 이치이고, 여기서는 그게
- * 셰이더 한 줄로 자동으로 일어난다.
- *
- * 색은 파랗게 죽인다. 안개는 280m 부터라 여기까지 안 오지만, 멀리 있는 것이
- * 푸르고 흐려 보이는 건 공기 때문이라 **색으로 흉내내는 게 정확하다.**
- * 능선을 셋으로 겹치는 것도 같은 이유다 — 겹치는 실루엣이 깊이를 만든다.
+ * ⚠ 작다. 캐릭터가 1.5m 인 세계에서 게가 0.6m 면 이미 큰 게인데, 이보다 작게
+ *   만들면 24m 거리(카메라)에서 모래 위의 점이 된다. 실제 크기보다 **보이는
+ *   크기**를 택하는 건 열기구 바구니에서 이미 한 선택이다.
  */
-export function buildFarIsland(scale: number): BufferGeometry {
+export function buildCrab(): BufferGeometry {
+  const SHELL = "#e0623f";
+  const SHELL_DARK = "#b8482c";
+  const LEG = "#c9512f";
+  const EYE = "#22303a";
+
+  const pieces: Piece[] = [
+    // 등딱지 — 납작한 타원. 가로로 넓어야 게다.
+    {
+      geometry: new SphereGeometry(1, 14, 10),
+      color: SHELL,
+      scale: [0.3, 0.13, 0.22],
+      position: [0, 0.14, 0],
+    },
+    // 등의 그늘. 한 톤 더 어두운 띠가 있으면 껍데기가 판판해 보이지 않는다.
+    {
+      geometry: new SphereGeometry(1, 12, 8),
+      color: SHELL_DARK,
+      scale: [0.26, 0.05, 0.16],
+      position: [0, 0.2, 0.04],
+    },
+  ];
+
+  // 다리 여덟. 옆으로 뻗어 바닥을 짚는다.
+  for (const side of [-1, 1]) {
+    for (const [i, offset] of [-0.13, -0.04, 0.05, 0.14].entries()) {
+      pieces.push({
+        geometry: new CylinderGeometry(0.018, 0.012, 0.26, 4),
+        color: LEG,
+        rotation: [0, 0, (side * Math.PI) / 2.6 + (i - 1.5) * 0.06],
+        position: [side * 0.3, 0.07, offset],
+      });
+    }
+  }
+
+  // 집게 둘. 앞으로 내밀어야 게로 읽힌다.
+  for (const side of [-1, 1]) {
+    pieces.push(
+      {
+        geometry: new CylinderGeometry(0.028, 0.022, 0.22, 5),
+        color: LEG,
+        rotation: [0.5, (side * -Math.PI) / 4, 0],
+        position: [side * 0.24, 0.1, -0.2],
+      },
+      {
+        geometry: new SphereGeometry(0.075, 8, 6),
+        color: SHELL,
+        scale: [1, 0.7, 1.4],
+        rotation: [0, side * -0.5, 0],
+        position: [side * 0.3, 0.09, -0.32],
+      },
+    );
+  }
+
+  // 눈 — 자루 위에 얹힌 검은 점 둘.
+  for (const side of [-1, 1]) {
+    pieces.push(
+      {
+        geometry: new CylinderGeometry(0.014, 0.014, 0.09, 4),
+        color: LEG,
+        position: [side * 0.08, 0.24, -0.12],
+      },
+      {
+        geometry: new SphereGeometry(0.035, 6, 5),
+        color: EYE,
+        position: [side * 0.08, 0.29, -0.12],
+      },
+    );
+  }
+
+  return mergeColored(pieces);
+}
+
+// ── 저 멀리 섬 ──────────────────────────────────────
+
+/** 능선 옆선. x 가 좌우, y 가 높이(해수면 기준). */
+function ridgeProfile(): Shape {
+  const shape = new Shape();
+  shape.moveTo(-44, -6);
+  // 왼쪽 자락 — 길고 완만하게 물에서 올라온다.
+  shape.quadraticCurveTo(-30, 2, -19, 8.5);
+  // 봉우리. 정상은 한 번만, 살짝 왼쪽으로 치우치게.
+  shape.bezierCurveTo(-11, 15, -7, 23.5, -1, 24);
+  // 오른쪽 어깨 — 한 번 꺾이고 다시 흐른다. 좌우가 대칭이면 무덤이다.
+  shape.bezierCurveTo(6, 24.5, 9, 15, 14, 12);
+  shape.bezierCurveTo(22, 8, 30, 4, 46, -6);
+  shape.lineTo(-44, -6);
+  return shape;
+}
+
+/** 뒤에 겹치는 낮은 능선. 겹치는 실루엣이 깊이를 만든다. */
+function backRidgeProfile(): Shape {
+  const shape = new Shape();
+  shape.moveTo(-30, -6);
+  shape.quadraticCurveTo(-16, 6, -4, 13);
+  shape.bezierCurveTo(4, 18, 10, 19, 18, 14);
+  shape.quadraticCurveTo(28, 8, 36, -6);
+  shape.lineTo(-30, -6);
+  return shape;
+}
+
+/**
+ * 옆선의 위쪽 가장자리만. 아래 닫는 선(y=-6)은 버린다.
+ *
+ * 능선을 **초록 봉우리 + 흙빛 자락** 두 장으로 나눠 그리는 데 쓴다.
+ */
+function ridgeCrest(shape: Shape): Vector2[] {
+  return shape.getPoints(140).filter((point) => point.y > -5.9);
+}
+
+/**
+ * 능선의 위쪽만 잘라낸 모양.
+ *
+ * ⚠ y 를 그냥 잘라 올리면(clamp) 자락이 있던 자리가 **가로 일자**로 남아,
+ *   섬 옆으로 초록 판때기가 삐져나온다. 잘라낸 높이보다 위에 있는 구간만
+ *   골라 그 구간의 양 끝에서 아래로 닫아야 한다.
+ */
+function crestAbove(shape: Shape, floor: number): Shape {
+  const above = ridgeCrest(shape).filter((point) => point.y >= floor);
+  const cut = new Shape();
+  const first = above[0];
+  const last = above[above.length - 1];
+  if (!first || !last) return cut;
+
+  cut.moveTo(first.x, floor);
+  for (const point of above) cut.lineTo(point.x, point.y);
+  cut.lineTo(last.x, floor);
+  cut.lineTo(first.x, floor);
+  return cut;
+}
+
+export function buildFarIsland(spread: number, rise = 1): BufferGeometry {
   /**
-   * ⚠ 한 번 어둡게 잡았다가 밝혔다. 175m 는 안개(280m)가 닿지 않는 거리라
-   *   셰이더가 흐려주지 않는데, 진한 색으로 두면 **가까운 바위섬**처럼 또렷하게
-   *   서 있다. 멀리 있는 것이 푸옇게 보이는 건 공기 때문이니, 그 몫을 색으로
-   *   직접 갚아야 한다 — 하늘색에 가까울수록 멀어 보인다.
+   * ⚠ 나무가 없다. 두 번 고쳐 심었지만(줄기가 섬 배율로 같이 커져 17m 가 되고,
+   *   능선 높이를 근사해서 허공에 떴고) 애초에 이 거리에서 3m 짜리 나무는
+   *   화면에서 **한 픽셀**이다. 안 보이는 걸 고쳐 봐야 안 보이고, 조금이라도
+   *   보이게 키우면 그건 나무가 아니라 섬만 한 무언가다. 없는 게 맞다.
+   *
+   * 색은 **초록과 흙** 두 가지. 능선 위쪽은 풀, 아래 자락은 마른 흙이다.
+   * 멀리 있는 만큼 둘 다 하늘 쪽으로 죽여 놓는다 — 안개(620m)가 닿지 않는
+   * 거리라 셰이더가 흐려주지 않으므로, 그 몫을 색으로 갚아야 **가까운 섬**으로
+   * 보이지 않는다.
    */
-  const NEAR_RIDGE = "#93b2c6";
-  const MID_RIDGE = "#a1bdd0";
-  const FAR_RIDGE = "#aecad9";
+  const GRASS = "#7c9a6f";
+  const GRASS_BACK = "#93aa88";
+  const EARTH = "#b3a183";
+  const EARTH_BACK = "#c0b096";
+  /** 초록이 시작되는 높이. 이 아래는 흙이다. */
+  const TREE_LINE = 9;
+
+  const extrude = (shape: Shape, depth: number) =>
+    new ExtrudeGeometry(shape, {
+      depth,
+      bevelEnabled: true,
+      bevelSize: 1.2,
+      bevelThickness: 1.2,
+      bevelSegments: 2,
+      curveSegments: 14,
+    });
+
+  const front = ridgeProfile();
+  const back = backRidgeProfile();
 
   return mergeColored([
-    // 가장 큰 능선.
+    // 뒤쪽 능선 먼저. 앞 능선에 가려 위쪽만 보인다.
     {
-      geometry: new SphereGeometry(1, 20, 12),
-      color: MID_RIDGE,
-      scale: [30 * scale, 19 * scale, 22 * scale],
-    },
-    // 옆으로 뻗은 낮은 자락.
-    {
-      geometry: new SphereGeometry(1, 18, 10),
-      color: NEAR_RIDGE,
-      scale: [22 * scale, 11 * scale, 16 * scale],
-      position: [24 * scale, -1 * scale, 4 * scale],
+      geometry: extrude(back, 10),
+      color: EARTH_BACK,
+      scale: [spread, rise, 1],
+      position: [6 * spread, 0, -16],
     },
     {
-      geometry: new SphereGeometry(1, 16, 10),
-      color: NEAR_RIDGE,
-      scale: [15 * scale, 8 * scale, 13 * scale],
-      position: [-26 * scale, -2 * scale, 2 * scale],
+      geometry: extrude(crestAbove(back, TREE_LINE - 2), 10.4),
+      color: GRASS_BACK,
+      scale: [spread, rise, 1],
+      position: [6 * spread, 0, -16.2],
     },
-    // 뒤로 물러난 봉우리. 하나가 솟아야 섬이 덩어리가 아니라 지형으로 읽힌다.
+    { geometry: extrude(front, 16), color: EARTH, scale: [spread, rise, 1] },
+    /**
+     * 초록 봉우리는 흙 자락보다 **조금 더 두껍게** 밀어낸다. 같은 두께면
+     * 앞면끼리 같은 자리에 놓여 z 싸움이 나고, 화면에서 지글거린다.
+     */
     {
-      geometry: new ConeGeometry(1, 1, 9),
-      color: FAR_RIDGE,
-      scale: [13 * scale, 26 * scale, 13 * scale],
-      position: [-9 * scale, 10 * scale, -7 * scale],
-    },
-    {
-      geometry: new ConeGeometry(1, 1, 8),
-      color: FAR_RIDGE,
-      scale: [9 * scale, 17 * scale, 9 * scale],
-      position: [10 * scale, 7 * scale, -5 * scale],
+      geometry: extrude(crestAbove(front, TREE_LINE), 16.5),
+      color: GRASS,
+      scale: [spread, rise, 1],
+      position: [0, 0, -0.3],
     },
   ]);
 }
+
+// ── 고래 ────────────────────────────────────────────
+
+/**
+ * 날개꼴 한 장(꼬리·가슴지느러미·등지느러미).
+ *
+ * ⚠ 타원체를 눌러 만들면 안 된다. 처음엔 그렇게 했는데, 눌린 공은 어느
+ *   각도에서 봐도 **검은 덩어리**라 지느러미로 안 읽혔다. 지느러미가
+ *   지느러미로 보이는 건 뒤로 젖은 **뾰족한 실루엣** 때문이고, 그건 옆선을
+ *   직접 그려야 나온다 — 먼 섬을 능선으로 그린 것과 같은 이유다.
+ *
+ * x 가 뻗는 쪽, y 가 앞뒤(+가 뒤). sweep 이 클수록 뒤로 눕는다.
+ */
+function whaleBlade(
+  span: number,
+  root: number,
+  tip: number,
+  sweep: number,
+): Shape {
+  const blade = new Shape();
+  blade.moveTo(0, -root * 0.5);
+  blade.quadraticCurveTo(
+    span * 0.6,
+    sweep * 0.35 - tip,
+    span,
+    sweep - tip * 0.5,
+  );
+  blade.quadraticCurveTo(
+    span * 0.98,
+    sweep + tip * 0.2,
+    span * 0.9,
+    sweep + tip * 0.5,
+  );
+  blade.quadraticCurveTo(span * 0.45, sweep * 0.7 + root * 0.35, 0, root * 0.5);
+  blade.closePath();
+  return blade;
+}
+
+function bladeGeometry(shape: Shape, thickness: number): BufferGeometry {
+  const blade = new ExtrudeGeometry(shape, {
+    depth: thickness,
+    bevelEnabled: true,
+    bevelSize: thickness * 0.5,
+    bevelThickness: thickness * 0.5,
+    bevelSegments: 1,
+    curveSegments: 10,
+  });
+  // 눕혀서 수평 날개로. 두께 방향이 위아래가 된다.
+  blade.rotateX(Math.PI / 2);
+  return blade;
+}
+
+/**
+ * 몸통 옆선. x 가 반지름, y 가 코(-)에서 꼬리(+)로 가는 축.
+ *
+ * 꼬리자루 앞에서 끊는다 — 그 뒤는 **따로 움직이는 조각**이다.
+ */
+function whaleProfile(): Vector2[] {
+  return [
+    new Vector2(0, -15.4),
+    new Vector2(1.15, -13.6),
+    new Vector2(2.15, -10.8),
+    new Vector2(2.85, -6.6),
+    new Vector2(3.05, -2.4),
+    new Vector2(2.9, 1.6),
+    new Vector2(2.35, 5),
+    new Vector2(1.7, 7.4),
+    new Vector2(0, 8.4),
+  ];
+}
+
+/** 꼬리자루 옆선. 관절(0)에서 꼬리지느러미(+)까지. */
+function peduncleProfile(): Vector2[] {
+  return [
+    new Vector2(0, -1.4),
+    new Vector2(1.5, -0.6),
+    new Vector2(1.25, 0),
+    new Vector2(0.85, 2.4),
+    new Vector2(0.5, 4.4),
+    new Vector2(0.3, 5.6),
+    new Vector2(0, 6.2),
+  ];
+}
+
+/**
+ * 몸통 기준 꼬리가 붙는 자리(m).
+ *
+ * ⚠ 통짜로 만들면 안 된다. 한 덩어리로 뽑아 놓으니 30m 짜리가 수면 위를
+ *   **미끄러져 지나가는** 그림이 됐고, 그건 헤엄치는 고래가 아니라
+ *   떠내려가는 고래로 보인다 — 살아 있다는 신호는 몸이 아니라 **꼬리**가 낸다.
+ *   상어와 같은 방식으로 관절 하나를 두고 따로 젓게 한다. 다만 방향이 다르다:
+ *   상어는 좌우로, 고래는 **위아래**로 젓는다.
+ */
+export const WHALE_TAIL_JOINT = 8;
+
+/**
+ * 고래. 30m 짜리다 — 배(9m)의 세 배가 넘고, 이 세계에서 가장 큰 물건이다.
+ *
+ * ── 크기와 거리를 함께 정한다 ──
+ * 세 번 고쳤다. 20m 로 60m 앞에 뒀더니 화면을 가로지르는 **비행선**이었고,
+ * 15m 로 줄이니 이번엔 그냥 큰 물고기였다. 웅장함은 크기가 아니라
+ * **크기와 거리의 조합**이다 — 멀리 있는 것이 그만큼 커 보이면 그때 비로소
+ * "저게 얼마나 큰 거야" 가 된다. 그래서 두 배로 키우고 두 배로 물렸다.
+ *
+ * ── 왜 옆선을 돌려 만드나 ──
+ * 타원체 네 개를 겹쳐 몸을 만들었더니 이음매마다 단이 져서 **소시지를 묶어
+ * 놓은 것**처럼 보였고, 흰 배가 옆구리를 뚫고 나와 얼룩이 됐다. 고래의 몸은
+ * 하나의 매끈한 방추형이라, 옆선 하나를 축 둘레로 돌리는 게 맞다(LatheGeometry).
+ * 100m 밖에서 보이는 건 실루엣뿐이고, 실루엣은 이음매를 용서하지 않는다.
+ *
+ * 캐릭터·배와 같은 규칙으로 **로컬 -Z 가 정면**이다.
+ */
+const WHALE_BACK = "#33485c";
+const WHALE_FIN = "#2a3c4e";
+
+/** 꼬리자루와 꼬리지느러미. 원점이 관절이다. */
+export function buildWhaleTail(): BufferGeometry {
+  const stock = new LatheGeometry(peduncleProfile(), 14);
+  stock.rotateX(Math.PI / 2);
+  stock.scale(1, 0.72, 1);
+
+  const pieces: Piece[] = [{ geometry: stock, color: WHALE_BACK }];
+
+  /**
+   * 꼬리. 좌우로 크게 벌어진 초승달이라야 고래로 읽힌다 —
+   * 잠수할 때 물 위로 드는 순간 이 한 장이 전부다.
+   */
+  for (const side of [1, -1] as const) {
+    const fluke = bladeGeometry(whaleBlade(6.8, 3.4, 1.1, 2.6), 0.45);
+    fluke.scale(side, 1, 1);
+    pieces.push({ geometry: fluke, color: WHALE_FIN, position: [0, 0.2, 5.4] });
+  }
+  return mergeColored(pieces);
+}
+
+export function buildWhale(): BufferGeometry {
+  const BACK = WHALE_BACK;
+  const BELLY = "#8fa3ab";
+  const FIN = WHALE_FIN;
+  const EYE = "#111820";
+
+  /**
+   * 몸통. 옆선을 돌린 뒤 눕히고, 위아래로 살짝 눌러 등이 넓적하게 만든다.
+   * (돌리기·눕히기·누르기를 지오메트리에 직접 건다 — 조각의 scale 은
+   *  돌리기 전에 먹으므로 여기서는 축이 어긋난다.)
+   */
+  const body = new LatheGeometry(whaleProfile(), 20);
+  body.rotateX(Math.PI / 2);
+  body.scale(1, 0.82, 1);
+
+  // 아래턱과 배. 등보다 좁고 낮게 — 옆에서 보면 안 보여야 한다.
+  const belly = new LatheGeometry(whaleProfile(), 16);
+  belly.rotateX(Math.PI / 2);
+  belly.scale(0.82, 0.5, 0.96);
+
+  const pieces: Piece[] = [
+    { geometry: body, color: BACK },
+    { geometry: belly, color: BELLY, position: [0, -1.35, 0.4] },
+  ];
+
+  // 가슴지느러미. 혹등고래처럼 길게 뻗고 뒤로 젖어 있다.
+  for (const side of [1, -1] as const) {
+    const flipper = bladeGeometry(whaleBlade(7.4, 2.4, 0.9, 3.4), 0.4);
+    flipper.scale(side, 1, 1);
+    flipper.rotateZ(side * 0.42);
+    pieces.push({
+      geometry: flipper,
+      color: FIN,
+      position: [side * 2.1, -1.1, -5.2],
+    });
+  }
+
+  // 등지느러미. 세워서 붙인다 — 눕힌 날개를 다시 세우면 된다.
+  const dorsal = bladeGeometry(whaleBlade(2.4, 2.2, 0.5, 1.9), 0.42);
+  dorsal.rotateZ(-Math.PI / 2);
+  pieces.push({ geometry: dorsal, color: FIN, position: [0, 2, 3.6] });
+
+  for (const side of [-1, 1] as const) {
+    pieces.push({
+      geometry: new SphereGeometry(0.3, 8, 6),
+      color: EYE,
+      position: [side * 2.4, -0.2, -10.4],
+    });
+  }
+
+  return mergeColored(pieces);
+}
+
+/** 숨구멍 자리(로컬). 분수는 여기서 솟는다. */
+export const WHALE_BLOWHOLE: readonly [number, number, number] = [0, 2.2, -8.4];

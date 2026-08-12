@@ -21,13 +21,24 @@ interface HudState {
    * ChatComposer 혼자 알고 있으면 TouchControls 가 비켜줄 방법이 없어서 여기 둔다.
    */
   chatOpen: boolean;
+  /**
+   * 지금 **보는 화면**인가 — 앉아 있거나, 열기구를 타고 있거나.
+   *
+   * 카메라가 캐릭터를 놓고 딴 데를 보는 동안에는 걸어다니는 UI 가 전부 거짓말이
+   * 된다. 조이스틱은 갈 수 없는 곳을 가리키고, "E 앉기" 는 하늘에 떠서도 뜬다.
+   * 그 상황을 아는 건 컨텐츠(features)인데 접어야 하는 건 HUD 라, 여기서 만난다.
+   */
+  immersive: boolean;
   setNearby(id: string | null, label: string | null): void;
   openPanel(id: string): void;
   closePanel(): void;
   setChatOpen(open: boolean): void;
+  setImmersive(on: boolean): void;
 }
 
 export const useHudStore = create<HudState>()((set) => ({
+  immersive: false,
+  setImmersive: (immersive) => set({ immersive }),
   nearbyId: null,
   nearbyLabel: null,
   openPanelId: null,

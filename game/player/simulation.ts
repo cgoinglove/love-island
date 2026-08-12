@@ -69,6 +69,13 @@ export interface PlayerState {
   vy: number;
   yaw: number;
   grounded: boolean;
+  /**
+   * 물에 빠져 있는가.
+   *
+   * 상태를 따로 주고받지 않는다 — **좌표만 있으면 각자 계산할 수 있다**(물 위인가).
+   * 그래서 남이 물에 빠진 것도 통신 한 바이트 없이 그대로 보인다.
+   */
+  swimming: boolean;
 }
 
 /** 한 스텝에 들어가는 조작 의도. 키보드든 탭이든 조이스틱이든 여기로 모인다. */
@@ -85,7 +92,102 @@ export const IDLE_INTENT: MoveIntent = {
 };
 
 export function createPlayerState(x = 0, z = 0, yaw = 0): PlayerState {
-  return { x, z, y: 0, vx: 0, vz: 0, vy: 0, yaw, grounded: true };
+  return {
+    x,
+    z,
+    y: 0,
+    vx: 0,
+    vz: 0,
+    vy: 0,
+    yaw,
+    grounded: true,
+    swimming: false,
+  };
+}
+
+/**
+ * 헤엄칠 때의 속도 배수. 걷는 것보다 확실히 느려야 물에 빠진 게 **사고**로 읽힌다.
+ */
+const SWIM_SPEED = 0.34;
+
+/**
+ * 물이 어디에 얼마나 있는지 알려주는 창구.
+ *
+ * ⚠ 섬의 지형 함수를 여기서 직접 부르지 않는다. 이 파일이 three 도 react 도
+ *   모른다는 게 요점인데, **섬의 모양까지 알기 시작하면** 합성 그리드로 하던
+ *   테스트가 통째로 무너진다 — 실제로 그렇게 고쳤다가 "빈 벌판에서 달리기" 테스트가
+ *   깨졌다. 벌판의 x=45 가 진짜 섬에서는 바다였기 때문이다.
+ *
+ * 물을 밖에서 넣어주면 시뮬레이션은 여전히 순수하고, 테스트는 원하는 물을 만들어
+ * 쓸 수 있다. 실제 섬의 구현은 game/player/water.ts 에 있다.
+ */
+export interface WaterModel {
+  /** 이 자리의 지형 높이(m). 0 이하면 물이다. */
+  groundHeight(x: number, z: number): number;
+  /**
+   * 물가에서 얼마나 나갔나(m). 음수면 아직 뭍이다.
+   *
+   * 헤엄 범위를 이걸로 판정한다. 단순히 "여기 헤엄칠 수 있나" 만 물으면
+   * **범위 밖에 떨어진 사람이 영영 못 움직인다** — 열기구에서 먼바다로 뛰어내리면
+   * 사방이 다 막혀 물 위에 굳는다. 거리로 물으면 "안쪽으로 오는 건 언제나 허용"
+   * 이라는 규칙을 쓸 수 있고, 그게 밖으로 나가려는 걸 막는 조류 역할을 한다.
+   */
+  offshore(x: number, z: number): number;
+}
+
+/** 물이 없는 세계. 테스트 기본값이자, 물을 안 넘긴 호출부의 안전한 동작이다. */
+export const DRY_WORLD: WaterModel = {
+  groundHeight: () => 1,
+  offshore: () => Number.POSITIVE_INFINITY,
+};
+
+/**
+ * 물가에서 이만큼까지만 헤엄쳐 나갈 수 있다(m).
+ *
+ * ⚠ 취향이 아니라 **통신 계약** 때문이다. 좌표는 ±140 까지만 받는다
+ *   (shared/presence). 섬에서 가장 먼 물가가 반지름 121 이라, 여기를 넉넉히 잡으면
+ *   헤엄쳐 나간 사람의 좌표가 범위를 벗어나 위치 전송이 통째로 400 으로 튕긴다.
+ *   화면에는 "나만 안 움직이는" 것으로 보이고 원인을 찾기 아주 어렵다.
+ */
+export const SWIM_LIMIT = 4;
+
+/** 이 높이 아래는 물로 본다. island.isLandAt 과 같은 기준이다. */
+const WATER_LEVEL = 0.1;
+
+/**
+ * 이 자리에서 몸이 놓이는 높이(지형 기준 m).
+ *
+ * 땅에서는 0 — 지형 높이는 렌더링이 더한다. 물에서는 **수면까지 떠오른다**:
+ * 지형이 -1.6m 면 1.6 을 줘서 월드 높이가 0(해수면)이 되게 한다.
+ * 이게 없으면 물에 빠진 사람이 바닥에 서 있게 된다.
+ */
+function floorHeight(water: WaterModel, x: number, z: number): number {
+  const ground = water.groundHeight(x, z);
+  return ground > WATER_LEVEL ? 0 : -ground;
+}
+
+/**
+ * 헤엄쳐(또는 날아서) 갈 수 있는 자리인가.
+ *
+ * ⚠ "막힌 칸이 아니면 통과" 로 쓰면 안 된다. 그러면 공중에 뜬 동안 야자수와
+ *   게시판을 뚫고 지나간다 — 네비 그리드가 막아둔 건 물만이 아니기 때문이다.
+ *   뚫고 지나가도 되는 건 물뿐이라, 물인지를 직접 묻는다.
+ *
+ * ⚠ **안쪽으로 오는 건 언제나 허용한다.** 범위만 보면 어쩌다 멀리 떨어진 사람이
+ *   (열기구에서 뛰어내리거나 세게 밀쳐져서) 사방이 막힌 채 물 위에 굳는다.
+ *   나가는 것만 막으면 바다가 감옥이 아니라 조류가 된다.
+ */
+function canFloatAt(
+  grid: NavGrid,
+  water: WaterModel,
+  x: number,
+  z: number,
+  fromX: number,
+  fromZ: number,
+): boolean {
+  if (canStandAt(grid, x, z)) return true;
+  const to = water.offshore(x, z);
+  return to < SWIM_LIMIT || to < water.offshore(fromX, fromZ);
 }
 
 export function copyPlayerState(from: PlayerState, to: PlayerState): void {
@@ -130,6 +232,7 @@ export function stepPlayer(
   dt: number,
   config: MoveConfig,
   grid: NavGrid,
+  water: WaterModel = DRY_WORLD,
 ): void {
   const [dirX, dirZ] = normalizeXZ(intent.axis[0], intent.axis[1]);
   const hasInput = dirX !== 0 || dirZ !== 0;
@@ -146,7 +249,9 @@ export function stepPlayer(
    */
   const strength = Math.min(1, lengthXZ(intent.axis[0], intent.axis[1]));
   const topSpeed =
-    config.maxSpeed * (intent.sprint ? config.sprintMultiplier : 1);
+    config.maxSpeed *
+    (intent.sprint ? config.sprintMultiplier : 1) *
+    (state.swimming ? SWIM_SPEED : 1);
   /** 지금 이 입력이 향하는 속도. 세기를 여기에만 곱한다 — 아래 상한에는 안 곱한다. */
   const driveSpeed = topSpeed * strength;
 
@@ -178,36 +283,71 @@ export function stepPlayer(
    */
 
   // ── 수직 ──────────────────────────────────────────────
-  if (intent.jump && state.grounded) {
+  // 물에서는 못 뛴다. 허우적대는 사람이 제자리 점프를 하면 그건 물이 아니다.
+  if (intent.jump && state.grounded && !state.swimming) {
     state.vy = config.jumpSpeed;
     state.grounded = false;
   }
+  const floor = floorHeight(water, state.x, state.z);
   if (!state.grounded) {
     state.vy -= config.gravity * dt;
     state.y += state.vy * dt;
-    if (state.y <= 0) {
-      state.y = 0;
+    if (state.y <= floor) {
+      state.y = floor;
       state.vy = 0;
       state.grounded = true;
     }
+  } else {
+    /**
+     * 땅에 붙어 있는 동안에도 바닥 높이는 따라가야 한다.
+     * 물가를 헤엄쳐 나가면 바닥(수면)이 점점 높아지는데, 이걸 안 따라가면
+     * 몸이 물속으로 가라앉는다.
+     */
+    state.y = floor;
   }
 
   // ── 수평 ──────────────────────────────────────────────
+  /**
+   * 갈 수 있는 자리인가 — **땅이거나 들어가도 되는 물**이다.
+   *
+   * ⚠ 한때 걸어다닐 때는 땅만, 공중이거나 헤엄칠 때만 물을 허용했다. 그러다 보니
+   *   물에 들어가려면 **뛰어서 빠져야** 했고(물가에서 점프), 헤엄쳐 나올 때는
+   *   걸을 수도 헤엄칠 수도 없는 얇은 띠에 턱 걸렸다 — 물은 지형 높이 0.1m 에서
+   *   끝나는데 걸을 수 있는 칸은 거기서 몸 두께만큼 더 안쪽부터 시작하기 때문이다
+   *   (buildNavGrid 의 radius).
+   *
+   *   상태를 나눌 이유가 애초에 없었다. 물가로 걸어 들어가면 물에 잠기는 게
+   *   당연하고, 나올 때도 그냥 걸어 나오면 된다. 조건 하나로 합치니 두 문제가
+   *   같이 사라졌다.
+   *
+   * ⚠ 야자수와 게시판은 여전히 막는다 — canFloatAt 이 통과시키는 건 **물**뿐이다.
+   */
+  const passable = (x: number, z: number) =>
+    canFloatAt(grid, water, x, z, state.x, state.z);
+
   // 축을 하나씩 따로 옮긴다. 두 축을 동시에 판정하면 벽에 비스듬히 부딪혔을 때
   // 통째로 막혀서 딱 붙어버린다. 따로 하면 막힌 축만 죽고 나머지 축으로 미끄러진다.
   const nextX = state.x + state.vx * dt;
-  if (canStandAt(grid, nextX, state.z)) {
+  if (passable(nextX, state.z)) {
     state.x = nextX;
   } else {
     state.vx = 0;
   }
 
   const nextZ = state.z + state.vz * dt;
-  if (canStandAt(grid, state.x, nextZ)) {
+  if (passable(state.x, nextZ)) {
     state.z = nextZ;
   } else {
     state.vz = 0;
   }
+
+  /**
+   * 물에 떠 있는가는 **지금 발밑이 물인가**로 정한다.
+   * 따로 켜고 끄는 상태로 두면 반드시 어딘가에서 어긋난다 — 물 위에서 걷거나
+   * 땅 위에서 허우적대는 식으로. 좌표에서 유도하면 그런 경우가 아예 없다.
+   */
+  state.swimming =
+    state.grounded && water.groundHeight(state.x, state.z) <= WATER_LEVEL;
 
   // 서 있을 때 미세한 잔속도로 캐릭터가 부들거리지 않도록 임계값을 둔다.
   if (lengthXZ(state.vx, state.vz) > 0.05) {

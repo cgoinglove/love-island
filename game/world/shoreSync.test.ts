@@ -38,8 +38,9 @@ describe("셰이더와 지형 정의 동기화", () => {
      * 계수 목록만 보면 순서나 부호가 뒤집혀도 통과한다.
      * GLSL 식을 그대로 흉내 내어 값을 맞춰보는 게 진짜 검사다.
      */
+    // 반지름은 위 테스트가 따로 맞춘다. 여기서는 **식의 모양**을 검산한다.
     const fromGlsl = (angle: number) =>
-      40.0 *
+      ISLAND_BASE_RADIUS *
       (0.7747 -
         0.0268 * Math.sin(angle) -
         0.1665 * Math.sin(3 * angle) +
